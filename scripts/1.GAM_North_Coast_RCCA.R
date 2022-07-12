@@ -1,8 +1,8 @@
 ###
 ### Script based on one created by : Anita Giraldo on 21 March 2022
-### Script last updated by : Anita Giraldo on 19 April 2022
+### Script last updated by : Anita Giraldo on 11 July 2022 with added orb velocity and NPP from Tom
 
-## This script prepares the data for the density models of kelp in the north coast with RCCA data --
+## This script run the GAM of north coast with RCCA data --
 
 
 
@@ -68,7 +68,7 @@ o.dir <- here("outputs_nc_rcca")
 rcca.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/North_Coast_w_RCCA/raw_data"
 
 ## Load info on years RCCA ----
-years <- read.csv(paste(rcca.dir, "RCCA_North_Coast_sites.csv", sep ='/')) %>%
+years <- read.csv(paste(d.dir, "RCCA_North_Coast_sites.csv", sep ='/')) %>%
   glimpse()
 
 
