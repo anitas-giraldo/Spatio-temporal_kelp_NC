@@ -1,8 +1,8 @@
 ###
 ### Script based on one created by : Anita Giraldo on 21 March 2022
-### Script last updated by : Anita Giraldo on 19 April 2022
+### Script last updated by : Anita Giraldo on 11 July 2022 - with orb vel and Npp from Tom
 
-## This script prepares the data for the density models of kelp in the north coast with RCCA data --
+## This script runs models
 
 ## resources --
 # Box-Cox transformation
@@ -71,13 +71,13 @@ d.dir <- here("data")
 dd.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/Extract_env_data/nc.rcca.outputs"
 raw.dir <- here("data_raw")
 plots.dir <- here("plots")
-o.dir <- here("outputs_nc_rcca")
+o.dir <- here("outputs_nc_rcca_urchins")
 rcca.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/North_Coast_w_RCCA/raw_data"
 
 #o2.dir <- paste(o.dir, "gam_urchins3", sep ='/')
 
 ## Load info on years RCCA ----
-years <- read.csv(paste(rcca.dir, "RCCA_North_Coast_sites.csv", sep ='/')) %>%
+years <- read.csv(paste(d.dir, "RCCA_North_Coast_sites.csv", sep ='/')) %>%
   glimpse()
 
 
@@ -93,7 +93,7 @@ ncsites <- years %>%
 
 ## Load RCCA data ----
 
-df <- read.csv(paste(dd.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs.csv", sep ='/')) %>%
+df <- read.csv(paste(d.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs_orbvel_npp.csv", sep ='/')) %>%
   mutate_at(vars(site_name, month, year, transect, zone), list(as.factor)) %>%
   glimpse()
 
@@ -145,8 +145,11 @@ dat1 <- df.nc %>%
     # substrate
     mean_depth, mean_prob_of_rock, mean_vrm, mean_slope,
     # waves
-    wh_max, wh_mean, mean_waveyear, wh_95prc
-  ) %>%
+    wh_max, wh_mean, mean_waveyear, wh_95prc,
+    # Orb vel
+    UBR_Mean,
+    # NPP
+    Mean_Monthly_NPP, Max_Monthly_NPP_Upwelling, Mean_Monthly_NPP_Upwelling, Min_Monthly_NPP) %>%
   # Bio transformations
   mutate(log_den_NERLUE = log(den_NERLUE + 1),
          log_den_MESFRAAD = log(den_MESFRAAD + 1),
@@ -163,9 +166,14 @@ dat1 <- df.nc %>%
   # Temperature transformations
   mutate(log_Days_16C = log(Days_16C + 1)) %>%
   dplyr::select(-c(Days_16C)) %>%
-  # Other Env transformations
-  #mutate(log_npp.mean = log(npp.mean + 1)) %>%
-  #dplyr::select(-c(npp.mean)) %>%
+  # Orb vel transformations
+  mutate(log_UBR_Mean = log(UBR_Mean + 1)) %>%
+  dplyr::select(-c(UBR_Mean)) %>%
+  # NPP transformations
+  mutate(log_Mean_Monthly_NPP_Upwelling = log(Mean_Monthly_NPP_Upwelling + 1),
+         log_Min_Monthly_NPP = log(Min_Monthly_NPP + 1)) %>%
+  dplyr::select(-c(Mean_Monthly_NPP_Upwelling,
+                   Min_Monthly_NPP)) %>%
   glimpse() # Rows: 708
 
 
@@ -181,44 +189,11 @@ levels(dat2$year)
 # 1. Select predictors for this GAM ----
 names(dat2)
 
-dat3 <- dat2 %>%
-  dplyr::select(site_name, year, transect, zone, 
-                # bio
-                log_den_NERLUE, log_den_STRPURAD, log_den_PYCHEL,
-                # nitrate
-                Days_10N, 
-                Max_Monthly_Nitrate, Min_Monthly_Nitrate,
-                Mean_Monthly_Nitrate, Max_Monthly_Anomaly_Nitrate, 
-                Mean_Monthly_Summer_Nitrate,
-                # temperature
-                log_Days_16C, Mean_Monthly_Temp, MHW_Upwelling_Days, 
-                Min_Monthly_Temp, Mean_Monthly_Upwelling_Temp, 
-                Max_Monthly_Anomaly_Upwelling_Temp,
-                # climatic indices
-                npgo_mean, mei_mean,
-                # substrate
-                mean_depth, mean_prob_of_rock, log_mean_vrm, mean_slope,
-                # waves
-                wh_max, wh_mean, mean_waveyear, wh_95prc)
 
-length(dat3) # 29
-
-
-####
-
-#### MODEL URCHINS -- Urchins 3 ####
-
-# Use PRE and Post MHW data to fit the model
-
-glimpse(dat3)
-levels(dat3$year)
-
-# 1. Select predictors for this GAM ----
-names(dat3)
 
 # 2. Divide data into train and test ----
 
-inTraining <- createDataPartition(dat2$log_den_STRPURAD, p = 0.8, list = FALSE)
+inTraining <- createDataPartition(dat2$log_den_STRPURAD, p = 0.75, list = FALSE)
 train.gam <- dat2[ inTraining,]
 test.gam  <- dat2[-inTraining,]
 
@@ -230,7 +205,9 @@ names(train.gam)
 
 # 3. Set parameters to save outputs ----
 
-name <- 'urchins3'
+# URCHINS 4 ----
+
+name <- 'urchins4'
 
 o2.dir <- paste(o.dir, paste("gam", name, sep = '_'), sep ='/')
 
@@ -269,9 +246,14 @@ pred.vars <- c("Days_10N",
                "wh_max",
                "wh_mean",
                "mean_waveyear",
-               "wh_95prc")
+               "wh_95prc",
+               "log_UBR_Mean",                      
+               "Mean_Monthly_NPP",
+               "Max_Monthly_NPP_Upwelling",
+               "log_Mean_Monthly_NPP_Upwelling",    
+               "log_Min_Monthly_NPP")
 
-length(pred.vars) # 24
+length(pred.vars) # 29
 
 # 5. Define Null model ----
 
@@ -294,7 +276,7 @@ model.set <- generate.model.set(use.dat = train.gam,
                                 cov.cutoff = 0.7, # cut off for correlations
                                 #pred.vars.fact = fact.vars,
                                 #linear.vars="Distance",
-                                k=3,
+                                k=4,
                                 null.terms = "s(site_name, zone, bs = 're') +
                                 s(year, bs = 're')")
 
