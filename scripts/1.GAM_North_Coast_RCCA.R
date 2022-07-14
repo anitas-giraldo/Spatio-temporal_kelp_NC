@@ -385,17 +385,19 @@ out.i <- read.csv(paste(o2.dir, "best_models.csv", sep ='/')) %>%
 
 #### gam1 ----
 
-subname <- "1"
+subname <- "4"
 
-best.model.name=as.character(out.i$modname[1])
+best.model.name=as.character(out.i$modname[4])
 best.model <- out.list$success.models[[best.model.name]]
-best.model <- print(out.i$formula[1])
+best.model <- print(out.i$formula[4])
 
-gam1 <- gam(formula = log_den_NERLUE ~ s(log_den_PYCHEL, k = 6, bs = "cr") + 
+gam1 <- gam(formula = log_den_NERLUE ~ s(log_Days_16C, k = 3, bs = "cr") + 
+              s(log_den_STRPURAD, k = 4, bs = "cr") + 
               s(Max_Monthly_Nitrate, k = 6, bs = "cr") + 
-              s(Mean_Monthly_Summer_Temp, k = 6, bs = "cr") + 
-              s(Mean_Monthly_Temp, k = 6, bs = "cr") +
-              s(Min_Monthly_Nitrate, k = 6, bs = "cr") +
+              s(Mean_Monthly_NPP, k = 6, bs = "cr") + 
+              s(mean_prob_of_rock, k = 6, bs = "cr") +
+              #s(mean_prob_of_rock, k = 6, bs = "cr") +
+              s(mean_waveyear, k = 6, bs = "cr") +
               s(site_name, zone, bs = "re") + 
               s(year, bs = "re"), 
             family = tw(), data = train.gam, method = "REML")
@@ -454,8 +456,12 @@ glimpse(test.gam)
 
 
 testdata <- test.gam %>%
-  dplyr::select(log_den_NERLUE, log_den_PYCHEL, Max_Monthly_Nitrate,  Mean_Monthly_Summer_Temp,
-                Mean_Monthly_Temp, Min_Monthly_Nitrate,
+  dplyr::select(log_den_NERLUE, 
+                log_Days_16C, 
+                log_den_STRPURAD,
+                Max_Monthly_Nitrate, 
+                Mean_Monthly_NPP, 
+                mean_waveyear,
                 site_name, zone, year)
 
 fits <- predict.gam(mod, newdata=testdata, type='response', se.fit=T)
@@ -475,9 +481,10 @@ predicts.year = testdata%>%data.frame(fits)%>%
 ggmod.year <- ggplot(aes(x=year,y=response,fill=year), data=predicts.year) +
   ylab(" ")+
   xlab('survey_year')+
+  scale_fill_viridis(option = "A", discrete = T) +
   #   ggtitle(substitute(italic(name)))+
-  scale_fill_manual(#labels = c("2010", "2011", "2013", "2016", "2017", "2018", "2019", "2020"), 
-                    values=c("light blue", "blue", "dark blue", "black", "dark red", "red", "orange", "green")) +
+  # scale_fill_manual(#labels = c("2010", "2011", "2013", "2016", "2017", "2018", "2019", "2020"), 
+  #                   values=c("light blue", "blue", "dark blue", "black", "dark red", "red", "orange", "green", "purple")) +
   #scale_fill_manual(labels = c("Fished", "No-take"),values=c("red", "black"))+
   #scale_colour_manual(labels = c("Fished", "No-take"),values=c("red", "black"))+
   #scale_x_discrete(labels = c("2010", "2011", "2016", "2017", "2018", "2019", "2020"),limits = rev(levels(predicts.year$survey_year)))+
@@ -5175,9 +5182,9 @@ gam1 <- gam(formula = log_den_NERLUE ~ s(log_Days_16C, k = 3, bs = "cr") +
               s(log_den_STRPURAD, k = 5, bs = "cr") + 
               s(Max_Monthly_Nitrate, k = 4, bs = "cr") + 
               s(mean_waveyear, k = 8, bs = "cr") +
-              #s(mean_prob_of_rock, k = 4, bs = "cr") +
+              s(mean_prob_of_rock, k = 4, bs = "cr") +
               #s(mean_depth, k = 4, bs = "cr") +
-              s(wh_max, k = 4, bs = "cr") +
+              s(Mean_Monthly_NPP, k = 4, bs = "cr") +
               s(site_name, zone, bs = "re") + 
               s(year, bs = "re"), 
             family = tw(), data = train.gam, method = "REML")
@@ -5236,8 +5243,13 @@ glimpse(test.gam)
 
 
 testdata <- test.gam %>%
-  dplyr::select(log_den_NERLUE, log_den_STRPURAD, log_Days_16C, 
-                Max_Monthly_Nitrate, mean_waveyear, wh_max,
+  dplyr::select(log_den_NERLUE, 
+                log_den_STRPURAD, 
+                log_Days_16C, 
+                Max_Monthly_Nitrate, 
+                mean_waveyear,
+                mean_prob_of_rock,
+                Mean_Monthly_NPP,
                 site_name, zone, year)
 
 fits <- predict.gam(mod, newdata=testdata, type='response', se.fit=T)
@@ -6792,3 +6804,281 @@ plot(stability.stack)
 
 # save 
 writeRaster(stability.stack, paste(u.dir, "Stabilty_calculations_Urchins_NC_gam_V2.tif", sep ='/'), overwrite = T)
+
+###
+
+###
+
+###
+
+## For July 13th
+
+
+dat1 <- df.nc %>%
+  dplyr::select(
+    # Factors 
+    latitude, longitude,
+    site_name, year, transect, zone,
+    # Bio vars
+    den_NERLUE , den_MESFRAAD , den_STRPURAD , den_PYCHEL, den_HALRUF,
+    # Nitrate vars 
+    Days_10N, 
+    Min_Monthly_Nitrate, 
+    Max_Monthly_Nitrate,
+    Mean_Monthly_Nitrate,
+    Mean_Monthly_Upwelling_Nitrate,
+    Max_Monthly_Anomaly_Nitrate,
+    Mean_Monthly_Summer_Nitrate,
+    # Temperature vars
+    Days_16C ,
+    Mean_Monthly_Temp ,
+    Mean_Monthly_Summer_Temp,
+    MHW_Upwelling_Days  , 
+    Min_Monthly_Anomaly_Temp,
+    Max_Monthly_Anomaly_Upwelling_Temp,
+    Min_Monthly_Temp, 
+    Mean_Monthly_Upwelling_Temp,
+    #wh.95 ,   wh.max,
+    npgo_mean , mei_mean,
+    # substrate
+    mean_depth, mean_prob_of_rock, mean_vrm, mean_slope,
+    # waves
+    wh_max, wh_mean, mean_waveyear, wh_95prc,
+    # Orb vel
+    UBR_Mean, UBRYear_Mean, UBRYear_Max, UBR_Max,
+    # NPP
+    Mean_Monthly_NPP, Max_Monthly_NPP_Upwelling, Mean_Monthly_NPP_Upwelling, Min_Monthly_NPP,
+  ) %>%
+  # Bio transformations
+  mutate(log_den_NERLUE = log(den_NERLUE + 1),
+         log_den_MESFRAAD = log(den_MESFRAAD + 1),
+         log_den_STRPURAD = log(den_STRPURAD + 1),
+         log_den_PYCHEL = log(den_PYCHEL + 1),
+         log_den_HALRUF = log(den_HALRUF + 1),
+         log_mean_vrm = log(mean_vrm + 1)) %>%
+  dplyr::select(-c(den_NERLUE,
+                   den_MESFRAAD,
+                   den_STRPURAD,
+                   den_PYCHEL,
+                   den_HALRUF,
+                   mean_vrm)) %>%
+  # Temperature transformations
+  mutate(log_Days_16C = log(Days_16C + 1)) %>%
+  dplyr::select(-c(Days_16C)) %>%
+  # Orb vel transformations
+  mutate(log_UBR_Mean = log(UBR_Mean + 1),
+         log_UBR_Max = log(UBR_Max + 1),
+         log_UBRYear_Mean = log(UBRYear_Mean + 1),
+         log_UBRYear_Max = log(UBRYear_Max + 1)) %>%
+  #dplyr::select(-c(UBR_Mean)) %>%
+  # NPP transformations
+  mutate(log_Mean_Monthly_NPP_Upwelling = log(Mean_Monthly_NPP_Upwelling + 1),
+         log_Min_Monthly_NPP = log(Min_Monthly_NPP + 1)) %>%
+  dplyr::select(-c(Mean_Monthly_NPP_Upwelling,
+                   Min_Monthly_NPP)) %>%
+  glimpse() # Rows: 708
+
+
+# Drop NAs ----
+dat2 <- dat1 %>%
+  drop_na() %>%
+  glimpse() # Rows: 507
+
+## Divide Pre and Post ----
+levels(dat2$year)
+names(dat2)
+
+
+# 2. Divide data into train and test ----
+
+inTraining <- createDataPartition(dat2$log_den_NERLUE, p = 0.8, list = FALSE)
+train.gam <- dat2[ inTraining,]
+test.gam  <- dat2[-inTraining,]
+
+
+# run gam ----
+
+gam1 <- gam(formula = log_den_NERLUE ~ s(log_Days_16C, k = 3, bs = "cr") + 
+              s(log_den_STRPURAD, k = 4, bs = "cr") + 
+              s(Max_Monthly_Nitrate, k = 6, bs = "cr") + 
+              s(Mean_Monthly_NPP, k = 8, bs = "cr") + 
+              #s(mean_prob_of_rock, k = 6, bs = "cr") +
+              s(log_UBR_Max, k = 6, bs = "cr") +
+              #s(mean_waveyear, k = 6, bs = "cr") +
+              s(site_name, zone, bs = "re") + 
+              s(year, bs = "re"), 
+            family = tw(), data = train.gam, method = "REML")
+
+
+
+summary(gam1)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(gam1)
+dev.off()
+
+##
+
+gam2 <- gam(formula = log_den_NERLUE ~ s(log_Days_16C, k = 3, bs = "cr") + 
+              s(log_den_STRPURAD, k = 4, bs = "cr") + 
+              s(Max_Monthly_Nitrate, k = 6, bs = "cr") + 
+              #s(Mean_Monthly_NPP, k = 8, bs = "cr") + 
+              #s(mean_prob_of_rock, k = 6, bs = "cr") +
+              s(log_UBR_Max, k = 6, bs = "cr") +
+              s(mean_waveyear, k = 6, bs = "cr") +
+              s(site_name, zone, bs = "re") + 
+              s(year, bs = "re"), 
+            family = tw(), data = train.gam, method = "REML")
+
+
+
+summary(gam2)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(gam2)
+dev.off()
+
+
+
+gam1$aic
+gam1$deviance
+summary(gam1)
+gam.check(gam1)
+
+
+
+# png(file=paste(o.dir, paste(name,subname,'logden_NERLUE',"mod_fits.png",sep="_"), sep ='/'))
+# par(mfrow=c(3,3),mar=c(2,4,3,1))
+# visreg(gam1)
+# dev.off()
+
+##
+
+# Plot model results ----
+
+par(mfrow=c(3,2),mar=c(2,4,3,1))
+plot(gam1)
+dev.off()
+
+# save plot --
+pdf(file=paste(o2.dir, paste(name,subname,'logden_NERLUE',"fits.pdf",sep="_"), sep ='/'))
+#par(mfrow=c(3,2),mar=c(9,4,3,1))
+par(mfrow=c(3,2),mar=c(2,4,3,1))
+plot(gam1,all.terms=T,pages=1,residuals=T,pch=16)
+mtext(side=2,text='logden_NERLUE',outer=F)
+dev.off()
+
+##
+
+## PREDICT  gam ----
+mod<-gam2
+head(mod$model)
+testdata <- expand.grid(log_den_PYCHEL=mean(mod$model$log_den_PYCHEL),
+                        Max_Monthly_Nitrate=mean(mod$model$Max_Monthly_Nitrate),
+                        #mean_logvrm=mean(mod$model$mean_logvrm),
+                        Mean_Monthly_Summer_Temp=mean(mod$model$Mean_Monthly_Summer_Temp),
+                        Mean_Monthly_Temp=mean(mod$model$Mean_Monthly_Temp),
+                        Min_Monthly_Nitrate=mean(mod$model$Min_Monthly_Nitrate),
+                        site_name=(mod$model$site_name),
+                        zone=(mod$model$zone),
+                        year=(mod$model$year))%>%
+  distinct()%>%
+  glimpse()
+
+glimpse(test.gam)
+
+
+
+testdata <- test.gam %>%
+  dplyr::select(log_den_NERLUE, 
+                log_Days_16C, 
+                log_den_STRPURAD,
+                Max_Monthly_Nitrate, 
+                Mean_Monthly_NPP, 
+                log_UBR_Max,
+                mean_waveyear,
+                site_name, zone, year)
+
+fits <- predict.gam(mod, newdata=testdata, type='response', se.fit=T)
+
+
+predicts.year = testdata%>%data.frame(fits)%>%
+  group_by(year)%>% #only change here
+  summarise(response=mean(fit),se.fit=mean(se.fit))%>%
+  ungroup()
+# write.csv(predicts.year,paste(o.dir, "predicts_mod1.csv", sep ='/')) #there is some BUG in dplyr - that this fixes
+# predicts.year<-read.csv(paste(o.dir, "predicts_mod1.csv", sep ='/')) %>%
+#   mutate_at(vars(survey_year), list(as.factor)) %>%
+#   glimpse()
+
+
+# PLOTS for model for year  ----
+ggmod.year <- ggplot(aes(x=year,y=response,fill=year), data=predicts.year) +
+  ylab(" ")+
+  xlab('survey_year')+
+  scale_fill_viridis(option = "A", discrete = T) +
+  #   ggtitle(substitute(italic(name)))+
+  # scale_fill_manual(#labels = c("2010", "2011", "2013", "2016", "2017", "2018", "2019", "2020"), 
+  #                   values=c("light blue", "blue", "dark blue", "black", "dark red", "red", "orange", "green", "purple")) +
+  #scale_fill_manual(labels = c("Fished", "No-take"),values=c("red", "black"))+
+  #scale_colour_manual(labels = c("Fished", "No-take"),values=c("red", "black"))+
+  #scale_x_discrete(labels = c("2010", "2011", "2016", "2017", "2018", "2019", "2020"),limits = rev(levels(predicts.year$survey_year)))+
+  #scale_x_discrete(labels = c("2010", "2011", "2016", "2017", "2018", "2019", "2020")) +
+  geom_bar(stat = "identity")+
+  geom_errorbar(aes(ymin = response-se.fit,ymax = response+se.fit),width = 0.5) +
+  theme_classic()
+#Theme1+
+#annotate("text", x = -Inf, y=Inf, label = "(a)",vjust = 1, hjust = -.1,size=5)+
+#annotate("text", x = -Inf, y=Inf, label = "   Dosinia subrosea",vjust = 1, hjust = -.1,size=5,fontface="italic")
+ggmod.year 
+
+
+###
+
+# Plot latitudinally ----
+
+predicts.all <-  testdata %>% data.frame(fits)%>%
+  #group_by(survey_year)%>% #only change here
+  #summarise(response=mean(fit),se.fit=mean(se.fit))%>%
+  ungroup() %>%
+  glimpse()
+
+write.csv(predicts.all,paste(o2.dir, paste(name, subname, "preds.csv", sep = '-'), sep ='/'))
+
+ner.obs <- test.gam %>%
+  dplyr::select(year, site_name, zone, log_den_NERLUE) %>%
+  glimpse()
+
+pred.obs.all <- predicts.all %>%
+  dplyr::select(-log_den_NERLUE) %>%
+  left_join(ner.obs, by = c('year', 'site_name', 'zone')) %>%
+  glimpse()
+
+write.csv(pred.obs.all ,paste(o2.dir, paste(name, subname, "preds-obs.csv", sep = '-'), sep ='/'))
+
+# plot pred vs. observed ----
+pred.obs.all %>%
+  ggplot(aes(x = log_den_NERLUE, y = fit, color = zone)) +
+  geom_point() 
+
+
+# Plot observed vs. predicted ----
+library(ggpmisc)
+
+p <- ggplot(predicts.all, aes(x = fit, y = log_den_NERLUE, col = zone)) +        
+  geom_point() +
+  labs(x='Predicted', y='Observed', title='N. luetkeana') +
+  theme_bw()
+p
+
+my.formula <- y ~ x
+p <- ggplot(predicts.all, aes(x = fit, y = log_den_NERLUE)) +
+  geom_smooth(method = "lm", se=FALSE, color="black", formula = my.formula) +
+  stat_poly_eq(formula = my.formula, 
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+               parse = TRUE) +         
+  geom_point() +
+  labs(x='Predicted', y='Observed', title='N. luetkeana') +
+  theme_bw()
+p
+
