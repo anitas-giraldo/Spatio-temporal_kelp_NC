@@ -369,9 +369,9 @@ out.i <- read.csv(paste(o2.dir, "STRPURAD_best_models.csv", sep ='/')) %>%
 
 #### gam3 ----
 
-subname <- "3"
+subname <- "1"
 
-best.model.name=as.character(out.i$modname[3])
+best.model.name=as.character(out.i$modname[1])
 best.model.name
 #best.model <- out.list$success.models[[best.model.name]]
 #best.model <- out.list$formula[[best.model.name]]
@@ -380,14 +380,14 @@ best.model.name
 
 gam1 <- gam(formula = log_den_STRPURAD ~ 
               s(Days_10N, k = 6, bs = "cr") +
-              #s(log_mean_vrm, k = 10, bs = "cr") +
+              #s(log_Days_16C, k = 6, bs = "cr") +
               #log_mean_vrm +
-              s(Max_Monthly_Anomaly_Upwelling_Temp, k = 6, bs = "cr") + 
-              #s(mean_depth, k = 10, bs = "cr") + 
+              #s(log_Mean_Monthly_NPP_Upwelling, k = 3, bs = "cr") + 
+              s(log_Min_Monthly_NPP, k = 6, bs = "cr") + 
               mean_depth +
-              #s(mean_prob_of_rock, k = 10, bs = "cr") +
+              s(Max_Monthly_Anomaly_Upwelling_Temp, k = 6, bs = "cr") +
               mean_prob_of_rock +
-              s(wh_95prc, k = 6, bs = "cr") +
+              #s(wh_95prc, k = 6, bs = "cr") +
               s(site_name, zone, bs = "re") + 
               s(year, bs = "re"), 
             family = tw(), data = dat2, method = "GCV")
@@ -435,8 +435,9 @@ glimpse(test.gam)
 
 testdata <- dat2 %>%
   dplyr::select(log_den_STRPURAD, 
+                log_Min_Monthly_NPP,
                 Days_10N, 
-                wh_95prc,
+                #wh_95prc,
                 mean_depth, 
                 Max_Monthly_Anomaly_Upwelling_Temp,
                 mean_prob_of_rock, 
@@ -580,8 +581,9 @@ my.formula <- y ~ x
 p <- ggplot(predicts.all, aes(x = fit, y = log_den_STRPURAD)) +
   geom_smooth(method = "lm", se=FALSE, color="black", formula = my.formula) +
   stat_poly_eq(formula = my.formula, 
-               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
-               parse = TRUE, size = 7) +         
+               #aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+               aes(label = paste(..rr.label..)),
+               parse = TRUE, size = 4) +         
   geom_point() +
   labs(x='Predicted', y='Observed', title='S. purpuratus') +
   theme_bw()
