@@ -615,13 +615,13 @@ bm_form
 # 5. Run Gam ----
 
 gam1.3 <- gam(formula = log_den_STRPURAD ~ 
-                s(Days_10N, k = 4, bs = "cr") + 
-                s(log_Days_16C,  k = 4, bs = "cr") + 
-                s(log_Mean_Monthly_NPP_Upwelling, k = 4,  bs = "cr") + 
-                s(log_Min_Monthly_NPP, k = 4, bs = "cr") + 
+                #s(Days_10N, k = 4, bs = "cr") + 
+                #s(log_Days_16C,  k = 4, bs = "cr") + 
+                #s(log_Mean_Monthly_NPP_Upwelling, k = 4,  bs = "cr") + 
+                #s(log_Min_Monthly_NPP, k = 4, bs = "cr") + 
                 s(Max_Monthly_Anomaly_Upwelling_Temp,   k = 4, bs = "cr") + 
                 s(mean_depth, k = 4, bs = "cr") + s(mean_prob_of_rock, k = 4, bs = "cr") + 
-                s(log_UBR_Max, k = 4, bs = "cr") + 
+                #s(log_UBR_Max, k = 4, bs = "cr") + 
                 s(site_name, zone, bs = "re") + 
                 s(year, bs = "re"), 
             family = tw(), data = train.gam, method = "GCV")
