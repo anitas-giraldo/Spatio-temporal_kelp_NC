@@ -84,7 +84,7 @@ ncsites <- years %>%
 
 ## Load RCCA data ----
 
-df <- read.csv(paste(dd.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs_orbvel_npp.csv", sep ='/')) %>%
+df <- read.csv(paste(d.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs_orbvel_npp.csv", sep ='/')) %>%
   mutate_at(vars(site_name, month, year, transect, zone), list(as.factor)) %>%
   glimpse() # Rows: 1,154 rows
 
@@ -124,20 +124,28 @@ max.site <- just.kelp %>%
 prop.max <- just.kelp %>%
   left_join(max.site, by = c("site_name", "zone")) %>%
   mutate(prop.max_NERLUE = den_NERLUE/max.site.zone) %>%
-  glimpse() 
+  dplyr::select(-den_NERLUE) %>%
+  glimpse() # Rows: 708
+
+
+## joing back with df.nc ----
+
+df.nc2 <- prop.max %>%
+  left_join(df.nc, by = c("site_name", "year", "transect", "zone")) %>%
+  glimpse()
 
 
 
 ## Choose variables and transform needed ----
-names(df.nc)
+names(df.nc2)
 
-dat1 <- df.nc %>%
+dat1 <- df.nc2 %>%
   dplyr::select(
     # Factors 
     latitude, longitude,
     site_name, year, transect, zone,
     # Bio vars
-    den_NERLUE , den_MESFRAAD , den_STRPURAD , den_PYCHEL, den_HALRUF,
+    prop.max_NERLUE, den_NERLUE , den_MESFRAAD , den_STRPURAD , den_PYCHEL, den_HALRUF,
     # Nitrate vars 
     Days_10N, 
     Min_Monthly_Nitrate, 
@@ -168,6 +176,7 @@ dat1 <- df.nc %>%
   ) %>%
   # Bio transformations
   mutate(log_den_NERLUE = log(den_NERLUE + 1),
+         log_prop.max_NERLUE = log(prop.max_NERLUE + 0.001),
          log_den_MESFRAAD = log(den_MESFRAAD + 1),
          log_den_STRPURAD = log(den_STRPURAD + 1),
          log_den_PYCHEL = log(den_PYCHEL + 1),
@@ -198,40 +207,7 @@ dat2 <- dat1 %>%
   drop_na() %>%
   glimpse() # Rows: 507
 
-## Divide Pre and Post ----
-levels(dat2$year)
 
-# Pre-MHW --
-PreMHW <- dat2 %>%
-  dplyr::filter(year == "2006" |
-                  year == "2007" |
-                  year == "2008" | 
-                  year == "2009" |
-                  year == "2010" |
-                  year == "2011" |
-                  year == "2012" |
-                  year == "2013" ) %>%
-  droplevels() %>%
-  glimpse() # Rows: 282
-
-levels(PreMHW$year)
-length(levels(PreMHW$year)) # 8
-
-# Pre-MHW --
-PostMHW <- dat2 %>%
-  dplyr::filter(year == "2014" |
-                  year == "2015" |
-                  year == "2016" | 
-                  year == "2017" |
-                  year == "2018" |
-                  year == "2019" |
-                  year == "2020" |
-                  year == "2021" ) %>%
-  droplevels() %>%
-  glimpse() # Rows: 225
-
-levels(PostMHW$year)
-length(levels(PostMHW$year)) # 7
 
 
 ###
@@ -244,15 +220,14 @@ length(levels(PostMHW$year)) # 7
 # https://stats.stackexchange.com/questions/391912/how-to-fit-a-longitudinal-gam-mixed-model-gamm
 # https://github.com/beckyfisher/FSSgam/blob/master/case_study2_soft_sediment.R
 
-# Use Pre MHW data to fit the model --
 
 # 1. Select predictors for this GAM ----
-names(PreMHW)
+names(dat2)
 
 
 # 2. Divide data into train and test ----
 
-inTraining <- createDataPartition(dat2$log_den_NERLUE, p = 0.75, list = FALSE)
+inTraining <- createDataPartition(dat2$log_prop.max_NERLUE, p = 0.75, list = FALSE)
 train.gam <- dat2[ inTraining,]
 test.gam  <- dat2[-inTraining,]
 
@@ -265,36 +240,43 @@ names(train.gam)
 # 3. Set parameters to save outputs ----
 
 name <- 'V1'
-o2.dir <- paste(o.dir, paste("gam", name, sep = '_'), sep ='/')
+o2.dir <- paste(o.dir, paste("gam_prop_max", name, sep = '_'), sep ='/')
+o2.dir
 
 names(train.gam)
 
 # 4. Define predictor variables ----
 
-pred.vars <- c("Days_10N",
-               "Min_Monthly_Nitrate",
-               "Max_Monthly_Nitrate",
-               "Mean_Monthly_Nitrate",
+pred.vars <- c("Days_10N",                          
+               "Min_Monthly_Nitrate" ,
+               "Max_Monthly_Nitrate"  ,             
+               "Mean_Monthly_Nitrate" ,
                "Mean_Monthly_Upwelling_Nitrate",
-               "Max_Monthly_Anomaly_Nitrate" ,
-               "Mean_Monthly_Summer_Nitrate"  ,      
-               "Mean_Monthly_Temp"  ,
-               "Mean_Monthly_Summer_Temp" ,
-               "MHW_Upwelling_Days"  ,               
-               "Min_Monthly_Anomaly_Temp"   ,        
+               "Mean_Monthly_Summer_Nitrate" ,     
+               "Mean_Monthly_Temp"    ,
+               "Mean_Monthly_Summer_Temp"  ,
+               "MHW_Upwelling_Days"   ,
                "Max_Monthly_Anomaly_Upwelling_Temp",
-               "Min_Monthly_Temp"  ,                 
-               "Mean_Monthly_Upwelling_Temp",        
-               "wh.95",                             
-               "wh.max",                             
-               "npgo_mean",
-               "mei_mean",                    
-               "log_den_MESFRAAD" ,
-               "log_den_STRPURAD" ,                 
-               "log_den_PYCHEL" ,                   
-               "log_den_HALRUF",
-               "log_Days_16C",                      
-               "log_npp.mean" )
+               "Min_Monthly_Temp"  ,                
+               "Mean_Monthly_Upwelling_Temp",
+               "mean_depth" ,
+               "mean_prob_of_rock" ,
+               "mean_slope" ,
+               "wh_max" ,
+               "wh_mean" ,
+               "mean_waveyear"   ,
+               "wh_95prc"   ,
+               "Mean_Monthly_NPP" ,
+               "Max_Monthly_NPP_Upwelling"  ,
+               "log_den_MESFRAAD"  ,
+               "log_den_STRPURAD" ,                  
+               "log_den_PYCHEL" ,
+               "log_mean_vrm" ,
+               "log_Days_16C"  ,                    
+               "log_UBR_Mean"  ,
+               "log_Mean_Monthly_NPP_Upwelling" ,
+               "log_Min_Monthly_NPP"
+               )
 
 length(pred.vars) # 24
 
@@ -304,11 +286,11 @@ length(pred.vars) # 24
 
 #fact.vars <- c("survey_year")
 
-model.v1 <- gam(log_den_NERLUE ~ 
+model.v1 <- gam(prop.max_NERLUE ~ 
                   s(site_name, zone, bs = 're') +
                   s(year, bs = 're') ,
                 data = train.gam, 
-                family = tw(),
+                family = betar(link = "logit", eps=.Machine$double.eps*100),
                 method = "REML") 
 
 # 6. Define model set up ----
@@ -355,14 +337,14 @@ out.all <- c(out.all,list(out.i))
 var.imp <- c(var.imp,list(out.list$variable.importance$aic$variable.weights.raw))
 
 # 9. Save model fits and importance ----
-names(out.all) <- 'Nereo.density'
-names(var.imp) <- 'Nereo.density'
+names(out.all) <- 'prop_max_Nereo'
+names(var.imp) <- 'prop_max_Nereo'
 all.mod.fits <- do.call("rbind",out.all)
 all.var.imp <- do.call("rbind",var.imp)
 #write.csv(all.mod.fits[,-2], file=paste(o.dir, paste(name,"all.mod.fits.csv",sep="_"), sep ='/'))
-write.csv(mod.table, file = paste(o2.dir, "all.mod.fits.csv", sep ='/'))
-write.csv(out.i, file=paste(o2.dir, "best_models.csv", sep="/"))
-write.csv(all.var.imp, file=paste(o2.dir, "all.var.imp.csv", sep="/"))
+write.csv(mod.table, file = paste(o2.dir, "prop_max_all.mod.fits.csv", sep ='/'))
+write.csv(out.i, file=paste(o2.dir, "prop_max_best_models.csv", sep="/"))
+write.csv(all.var.imp, file=paste(o2.dir, "prop_max_all.var.imp.csv", sep="/"))
 
 
 # 10. plot the best models ----
