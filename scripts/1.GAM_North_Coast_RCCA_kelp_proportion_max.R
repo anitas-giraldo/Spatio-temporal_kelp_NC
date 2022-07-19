@@ -373,7 +373,7 @@ for(m in 1:nrow(out.i)){
 
 
 # 11. custom plot of importance scores----
-dat.taxa <- read.csv(paste(o2.dir, "all.var.imp.csv", sep ='/')) %>% #from local copy
+dat.taxa <- read.csv(paste(o2.dir, "prop_max_all.var.imp.csv", sep ='/')) %>% #from local copy
   rename(resp.var=X)%>%
   dplyr::select(-resp.var) %>% #glimpse()
   gather(key = predictor, value = importance) %>%
@@ -398,28 +398,29 @@ ggsave(namep, device = 'png', path = o2.dir)
 
  # Manually make the most parsimonious GAM models ----
 
-out.i <- read.csv(paste(o2.dir, "best_models.csv", sep ='/')) %>%
+out.i <- read.csv(paste(o2.dir, "prop_max_best_models.csv", sep ='/')) %>%
   glimpse()
 
 #### gam1 ----
 
-subname <- "4"
+subname <- "2"
 
 best.model.name=as.character(out.i$modname[2])
 best.model <- out.list$success.models[[best.model.name]]
 best.model <- print(out.i$formula[2])
 
 gam1 <- gam(formula = prop.max_NERLUE ~ 
-              #s(log_den_PYCHEL, k = 5, bs = "cr") +
+              #s(log_den_MESFRAAD, k = 5, bs = "cr") +
               s(log_den_STRPURAD, k = 5, bs = "cr") + 
               #s(Min_Monthly_Nitrate, k = 5, bs = "cr") +
               s(Max_Monthly_Nitrate, k = 5, bs = "cr") +
-              #s(log_Days_16C, k = 5, bs = "cr") +
-              #s(Mean_Monthly_Summer_Temp, k = 5, bs = "cr") + 
-              #s(Mean_Monthly_Upwelling_Temp, k = 4, bs = "cr") +
-              s(Mean_Monthly_NPP, k = 5, bs = "cr") +
-              s(mean_waveyear, k = 5, bs = "cr") +
-              s(log_UBR_Max, k = 5, bs = "cr") +
+              s(log_Mean_Monthly_NPP_Upwelling, k = 5, bs = "cr") +
+              s(log_Min_Monthly_NPP, k = 5, bs = "cr") +
+              s(Mean_Monthly_Summer_Temp, k = 5, bs = "cr") + 
+              #s(Min_Monthly_Temp, k = 4, bs = "cr") +
+              #s(Mean_Monthly_NPP, k = 5, bs = "cr") +
+              s(wh_95prc, k = 5, bs = "cr") +
+              #s(log_UBR_Max, k = 5, bs = "cr") +
               #s(Min_Monthly_Nitrate, k = 3, bs = "cr") +
               s(site_name, zone, bs = "re") + 
               s(year, bs = "re"), 
@@ -487,13 +488,19 @@ head(mod$model)
 glimpse(test.gam)
 
 
+mod<-gam1
 
 testdata <- test.gam %>%
   dplyr::select(prop.max_NERLUE, 
                 log_den_STRPURAD, 
+                Mean_Monthly_Summer_Temp,
+                Min_Monthly_Temp,
                 Max_Monthly_Nitrate,  
                 Mean_Monthly_NPP,
+                log_Min_Monthly_NPP,
+                log_Mean_Monthly_NPP_Upwelling,
                 Mean_Monthly_Upwelling_Temp, 
+                wh_95prc,
                 mean_waveyear,
                 log_UBR_Max, 
                 site_name, zone, year)
@@ -531,6 +538,12 @@ ggmod.year
 
 
 ## plot pred.vs obs ----
+
+predicts.all <-  testdata %>% data.frame(fits)%>%
+  #group_by(survey_year)%>% #only change here
+  #summarise(response=mean(fit),se.fit=mean(se.fit))%>%
+  ungroup() %>%
+  glimpse()
 
 my.formula <- y ~ x
 p <- ggplot(predicts.all, aes(x = fit, y = prop.max_NERLUE)) +
