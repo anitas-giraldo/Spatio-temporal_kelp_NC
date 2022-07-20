@@ -2295,7 +2295,7 @@ p
 ###
 
 
-###
+### BEST MODEL ----
 
 
 testdata <- test.gam %>%
@@ -2350,10 +2350,10 @@ p
 
 ###
 
-gam2.12 <- gam(prop.max_NERLUE ~ s(log_den_STRPURAD, k = 6, bs = "cr") +
+gam2.1 <- gam(prop.max_NERLUE ~ s(log_den_STRPURAD, k = 6, bs = "cr") +
                  #s(log_den_PYCHEL, k = 4, bs = "cr") +
                  s(log_Mean_Monthly_NPP_Upwelling, k = 6, bs = "cr") + 
-                 #s(log_Min_Monthly_NPP, k = 6, bs = "cr") + 
+                 s(log_Min_Monthly_NPP, k = 6, bs = "cr") + 
                  s(Max_Monthly_Nitrate, k = 5, bs = "cr") + 
                  s(Mean_Monthly_Summer_Temp,  k = 5, bs = "cr") + 
                  s(wh_95prc, k = 3, bs = "cr") + 
@@ -2363,13 +2363,13 @@ gam2.12 <- gam(prop.max_NERLUE ~ s(log_den_STRPURAD, k = 6, bs = "cr") +
                  s(site_name, zone, bs = "re") + s(year, bs = "re"),
                  family = betar(), data = train.gam)
 
-summary(gam2.12)
+summary(gam2.1)
 
 par(mfrow=c(3,3),mar=c(2,4,3,1))
-visreg(gam2.12)
+visreg(gam2.1)
 dev.off()
 
-fits <- predict.gam(gam2.12, newdata=testdata, type='response', se.fit=T)
+fits <- predict.gam(gam2.1, newdata=testdata, type='response', se.fit=T)
 
 ## plot pred.vs obs ----
 
@@ -2386,6 +2386,35 @@ p <- ggplot(predicts.all, aes(x = fit, y = prop.max_NERLUE)) +
                aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
                parse = TRUE) +         
   geom_point() +
+  geom_abline(aes(intercept = 0, slope = 1, color = 'red'), show.legend = F) +
   labs(x='Predicted', y='Observed', title='Proportion of maximum density N. luetkeana') +
   theme_bw()
 p
+
+
+## bar plot ----
+
+predicts.year = testdata%>%data.frame(fits)%>% #glimpse()
+  group_by(year)%>% #only change here
+  summarise(response=mean(fit),
+            se.fit=mean(se.fit),
+            observed = mean(prop.max_NERLUE, na.rm = T),
+            sd.observed = sd(prop.max_NERLUE, na.rm = T),
+            n.observed = length(prop.max_NERLUE),
+            se.observed = sd.observed/(sqrt(n.observed)))%>%
+  ungroup() %>%
+  glimpse()
+
+ggmod.year <- ggplot(aes(x=year,y=response,fill=year), data=predicts.year) +
+  ylab(" ")+
+  xlab('survey_year')+
+  scale_fill_viridis(discrete =T)+
+  geom_bar(stat = "identity")+
+  geom_errorbar(aes(ymin = response-se.fit,ymax = response+se.fit),width = 0.5) +
+  geom_line(aes(x=year, y= observed), group = 1, color = 'red', size = 1.5) +
+  geom_errorbar(aes(x=year,y=observed, ymin = observed-se.observed,ymax = observed+se.observed),width = 0.5, col = 'red') +
+  theme_classic()
+#Theme1+
+#annotate("text", x = -Inf, y=Inf, label = "(a)",vjust = 1, hjust = -.1,size=5)+
+#annotate("text", x = -Inf, y=Inf, label = "   Dosinia subrosea",vjust = 1, hjust = -.1,size=5,fontface="italic")
+ggmod.year 
