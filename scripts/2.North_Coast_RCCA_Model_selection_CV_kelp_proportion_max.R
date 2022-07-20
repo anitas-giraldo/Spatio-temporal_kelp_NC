@@ -291,7 +291,7 @@ for (i in 1:no_submodels){
   
   cv_mods <- folds %>% 
     mutate(train = map(train, as_tibble)) %>%
-    mutate(model = purrr::map(train, ~ gam(bm_form, family = tw, data = .))) %>%
+    mutate(model = purrr::map(train, ~ gam(bm_form, family = betar, data = .))) %>%
     glimpse()
   
   
@@ -299,7 +299,7 @@ for (i in 1:no_submodels){
   # 4.3. Add the null model  --
   cv_mods <- cv_mods %>% 
     mutate(train = map(train, as_tibble)) %>%
-    mutate(model.null = purrr::map(train, ~ gam(prop.max_NERLUE ~ 1, family = tw, data = .))) %>%
+    mutate(model.null = purrr::map(train, ~ gam(prop.max_NERLUE ~ 1, family = betar, data = .))) %>%
     glimpse()
   
   
@@ -478,10 +478,13 @@ beep()
 
 # 4. SAVE SUMMARY ----
 head(overall.summary)
+nrow(overall.summary)
 
 overall.summary <- na.omit(overall.summary)
 
-#write.csv(overall.summary, paste(d.dir, "gam_V4", "best_models_summary_stats.csv", sep ='/'))
+model_no <- "V1"
+
+write.csv(overall.summary, paste(k.dir, "best_models_CV_summary_stats.csv", sep ='/'))
 
 
 
@@ -501,7 +504,7 @@ p
 
 # save plot --
 
-#ggsave(plot = p, filename = "best_models_summary_stats.png", device = "png", path = paste(d.dir, "gam_V4", sep ='/'))
+ggsave(plot = p, filename = "best_models_CV_summary_stats.png", device = "png", path = paste(k.dir, sep ='/'))
 
 
 # 6. Compute best statistics ----
@@ -524,4 +527,35 @@ ggplot(sum.sum %>%
   scale_color_viridis() +
   theme(axis.text.x = element_text(angle = 45, h = 1))
 
+ggplot(sum.sum %>%
+         dplyr::select(sum_stat, sum_max, sum_min, submodel),
+       aes(x = submodel, y = sum_max, color = sum_max)) +
+  geom_point(size = 5) +
+  theme_bw() +
+  #facet_wrap(~ summary_stat, scales = "free") +
+  scale_color_viridis() +
+  theme(axis.text.x = element_text(angle = 45, h = 1))
 
+ggplot(sum.sum %>%
+         dplyr::select(sum_stat, sum_max, sum_min, submodel),
+       aes(x = submodel, y = sum_min, color = sum_min)) +
+  geom_point(size = 5) +
+  theme_bw() +
+  #facet_wrap(~ summary_stat, scales = "free") +
+  scale_color_viridis() +
+  theme(axis.text.x = element_text(angle = 45, h = 1))
+
+
+###
+
+bm_name2 <- best_mods$modname[2]
+bm_name2
+
+bm_name10 <- best_mods$modname[10]
+bm_name10
+
+bm_name18 <- best_mods$modname[18]
+bm_name18
+
+bm_name24 <- best_mods$modname[24]
+bm_name24
