@@ -136,7 +136,7 @@ dat1 <- df.nc %>%
     # waves
     wh_max, wh_mean, mean_waveyear, wh_95prc,
     # Orb vel
-    UBR_Mean,
+    UBR_Mean, UBR_Max,
     # NPP
     Mean_Monthly_NPP, Max_Monthly_NPP_Upwelling, Mean_Monthly_NPP_Upwelling, Min_Monthly_NPP,
   ) %>%
@@ -157,7 +157,8 @@ dat1 <- df.nc %>%
   mutate(log_Days_16C = log(Days_16C + 1)) %>%
   dplyr::select(-c(Days_16C)) %>%
   # Orb vel transformations
-  mutate(log_UBR_Mean = log(UBR_Mean + 1)) %>%
+  mutate(log_UBR_Mean = log(UBR_Mean + 1),
+         log_UBR_Max = log(UBR_Max + 1)) %>%
   dplyr::select(-c(UBR_Mean)) %>%
   # NPP transformations
   mutate(log_Mean_Monthly_NPP_Upwelling = log(Mean_Monthly_NPP_Upwelling + 1),
@@ -7081,4 +7082,94 @@ p <- ggplot(predicts.all, aes(x = fit, y = log_den_NERLUE)) +
   labs(x='Predicted', y='Observed', title='N. luetkeana') +
   theme_bw()
 p
+
+###
+
+###
+
+
+###
+
+###
+
+## For 20 July meeting ----
+
+gam1 <- gam(formula = log_den_NERLUE ~ 
+              #s(log_Days_16C, k = 3, bs = "cr") + 
+              s(log_den_STRPURAD, k = 8, bs = "cr") + 
+              s(Max_Monthly_Nitrate, k = 4, bs = "cr") + 
+              s(Mean_Monthly_Upwelling_Temp, k = 3, bs = "cr") +
+              #Mean_Monthly_Upwelling_Temp +
+              #s(mean_prob_of_rock, k = 4, bs = "cr") +
+              #s(mean_depth, k = 4, bs = "cr") +
+              #s(mean_waveyear, k = 6, bs = "cr") +
+              s(log_UBR_Max, k = 3, bs = "cr") +
+              s(Mean_Monthly_NPP, k = 6, bs = "cr") +
+              #s(Mean_Monthly_Summer_Nitrate, k = 6, bs = "cr") +
+              s(wh_max, k = 4, bs = "cr") +
+              s(site_name, zone, bs = "re") + 
+              s(year, bs = "re"), 
+            family = tw(), data = dat2, method = "REML")
+
+
+
+
+summary(gam1)
+gam.check(gam1)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(gam1)
+dev.off()
+
+## Test ----
+library(ggpmisc)
+
+fits <- predict.gam(gam1, newdata=test.gam, type='response', se.fit=T)
+
+## plot pred.vs obs ----
+
+predicts.all <-  test.gam %>% data.frame(fits)%>%
+  #group_by(survey_year)%>% #only change here
+  #summarise(response=mean(fit),se.fit=mean(se.fit))%>%
+  ungroup() %>%
+  glimpse()
+
+my.formula <- y ~ x
+p <- ggplot(predicts.all, aes(x = fit, y = log_den_NERLUE)) +
+  geom_smooth(method = "lm", se=FALSE, color="black", formula = my.formula) +
+  stat_poly_eq(formula = my.formula, 
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+               parse = TRUE) +         
+  geom_point() +
+  geom_abline(aes(intercept = 0, slope = 1, color = 'red'), show.legend = F) +
+  labs(x='Predicted', y='Observed', title='Log density N. luetkeana') +
+  theme_bw()
+p
+
+## bar plot ----
+
+predicts.year = test.gam%>%data.frame(fits)%>% #glimpse()
+  group_by(year)%>% #only change here
+  summarise(response=mean(fit),
+            se.fit=mean(se.fit),
+            observed = mean(log_den_NERLUE, na.rm = T),
+            sd.observed = sd(log_den_NERLUE, na.rm = T),
+            n.observed = length(log_den_NERLUE),
+            se.observed = sd.observed/(sqrt(n.observed)))%>%
+  dplyr::filter(year != "2006") %>%
+  ungroup() %>%
+  glimpse()
+
+ggmod.year <- ggplot(aes(x=year,y=response,fill=year), data=predicts.year) +
+  ylab(" ")+
+  xlab('survey_year')+
+  scale_fill_viridis(discrete =T)+
+  geom_bar(stat = "identity")+
+  geom_errorbar(aes(ymin = response-se.fit,ymax = response+se.fit),width = 0.5) +
+  geom_line(aes(x=year, y= observed), group = 1, color = 'red', size = 1.5) +
+  geom_errorbar(aes(x=year,y=observed, ymin = observed-se.observed,ymax = observed+se.observed),width = 0.5, col = 'red') +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, h = 1))
+
+ggmod.year 
 
