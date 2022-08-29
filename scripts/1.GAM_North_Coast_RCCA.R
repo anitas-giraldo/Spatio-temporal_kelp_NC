@@ -86,7 +86,18 @@ ncsites <- years %>%
 
 df <- read.csv(paste(dd.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs_orbvel_npp.csv", sep ='/')) %>%
   mutate_at(vars(site_name, month, year, transect, zone), list(as.factor)) %>%
-  glimpse()
+  mutate(zone_new = case_when(
+    transect == '1' ~ 'OUTER',
+    transect == '2' ~ 'OUTER', 
+    transect == '3' ~ 'OUTER', 
+    transect == '4' ~ 'INNER',
+    transect == '5' ~ 'INNER',
+    transect == '6' ~ 'INNER')) %>%
+  dplyr::select(-zone) %>%
+  rename(zone = zone_new) %>%
+  mutate_at(vars(zone), list(as.factor)) %>%
+  relocate(zone, .after = transect) %>%
+  glimpse() # Rows: 1,154
 
 
 ## get the sites for North Coast model ----
