@@ -680,11 +680,11 @@ names(year.raster) <- 'year'
 # outputs dir ----
 
 #o.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/Spatio_temporal_GAMs/outputs_nc_rcca/gam_V4/gam_5.1"
-preds.dir <- paste(o2.dir, "preds", sep ='/')
+preds.dir <- paste(o.dir, "gam_V.x", "preds", sep ='/')
 preds.dir
 
 # output for rasters scaled by rock 
-rock.preds.dir <- paste(o2.dir, "rock_preds", sep ='/')
+rock.preds.dir <- paste(o.dir, "gam_V.x", "rock_preds", sep ='/')
 rock.preds.dir
 
 # Version 3: V4_5.1.1_v3 : Using urchins3, which don't have VRM
@@ -777,7 +777,7 @@ for (i in 1:length(year.list)) {
 # preds.dir <- paste(o.dir, "sp_predictions_5.1.1_V3_rock", sep ='/')
 # preds.dir
 
-preds.dir <- paste(o2.dir, "preds", sep ='/')
+preds.dir <- paste(o.dir, "gam_V.x", "rock_preds", sep ='/')
 preds.dir
 
 #preds.dir <- rock.preds.dir
@@ -787,12 +787,12 @@ n.files <- dir(preds.dir)
 n.files <- list.files(preds.dir, pattern = '.tif', full.names = TRUE)
 n.files
 length(n.files)
-n.files <- n.files[-c(19, 20)]
+n.files <- n.files[-c(19, 20, 21)]
 # list names to load onto the Environment --
 names.list <- list.files(preds.dir, pattern = '.tif')
 names.list <- str_replace(names.list, ".tif", "")
 length(names.list)
-names.list <- names.list[-c(19,20)]
+names.list <- names.list[-c(19,20,21)]
 
 # load csv files as a list --
 tfiles <- lapply(n.files, rast) # this is a list
@@ -816,12 +816,12 @@ names(preds.stack) <- paste("Nereo", paste(2004:2021), sep ='_')
 stability.stack <- c()
 
 # calculate mean across years
-mean.nereo <- mean(preds.stack, na.rm = T)
+mean.nereo <- mean(preds.stack[[1:10]], na.rm = T)
 plot(mean.nereo)
 
 
 # calculate sd across years
-sd.nereo <- app(preds.stack, fun = sd, na.rm = T)
+sd.nereo <- app(preds.stack[[1:10]], fun = sd, na.rm = T)
 plot(sd.nereo)
 
 
@@ -840,12 +840,12 @@ names(stability.stack) <- c("mean_nereo", "sd_nereo", "s_nereo", "s_index_nereo"
 plot(stability.stack)
 
 # save 
-#writeRaster(stability.stack, paste(preds.dir, "rock_Stabilty_calculations_Nereo_NC_gam_28Aug22.tif", sep ='/'), overwrite = T)
+writeRaster(stability.stack, paste(preds.dir, "rock_premhw_Stabilty_Nereo_NC_gam_28Aug22.tif", sep ='/'), overwrite = T)
 
 ## get csv --
 
 st.df <- as.data.frame(stability.stack, xy = T) %>% glimpse()
-write.csv(st.df, paste(preds.dir, "Nereo_stability.csv", sep ='/'))
+write.csv(st.df, paste(preds.dir, "Nereo_premhw_stability.csv", sep ='/'))
 
 n.df <- as.data.frame(preds.stack, xy = T) %>% glimpse()
 write.csv(n.df, paste(preds.dir, "Nereo_year_preds.csv", sep ='/'))
