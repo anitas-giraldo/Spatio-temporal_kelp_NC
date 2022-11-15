@@ -77,6 +77,7 @@ years <- read.csv(paste(d.dir, "RCCA_North_Coast_sites.csv", sep ='/')) %>%
 ncsites <- years %>%
   mutate_at(vars(site_name), list(as.factor)) %>%
   # get only sites with PRE MHW data 
+  dplyr::filter(total.years > 2) %>%
   dplyr::filter(pre.mhw.years > 2) %>%
   droplevels() %>%
   glimpse() # Rows: 64
@@ -84,7 +85,7 @@ ncsites <- years %>%
 
 ## Load RCCA data ----
 
-df <- read.csv(paste(dd.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs_orbvel_npp.csv", sep ='/')) %>%
+df <- read.csv(paste(d.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs_orbvel_npp.csv", sep ='/')) %>%
   mutate_at(vars(site_name, month, year, transect, zone), list(as.factor)) %>%
   mutate(zone_new = case_when(
     transect == '1' ~ 'OUTER',
@@ -141,7 +142,7 @@ dat1 <- df.nc %>%
     Min_Monthly_Temp, 
     Mean_Monthly_Upwelling_Temp,
     #wh.95 ,   wh.max,
-    npgo_mean , mei_mean,
+    #npgo_mean , mei_mean,
     # substrate
     mean_depth, mean_prob_of_rock, mean_vrm, mean_slope,
     # waves
@@ -170,7 +171,7 @@ dat1 <- df.nc %>%
   # Orb vel transformations
   mutate(log_UBR_Mean = log(UBR_Mean + 1),
          log_UBR_Max = log(UBR_Max + 1)) %>%
-  dplyr::select(-c(UBR_Mean)) %>%
+  dplyr::select(-c(UBR_Mean, UBR_Max)) %>%
   # NPP transformations
   mutate(log_Mean_Monthly_NPP_Upwelling = log(Mean_Monthly_NPP_Upwelling + 1),
          log_Min_Monthly_NPP = log(Min_Monthly_NPP + 1)) %>%
@@ -250,39 +251,51 @@ names(train.gam)
 
 # 3. Set parameters to save outputs ----
 
-name <- 'V1'
+name <- 'V7'
 o2.dir <- paste(o.dir, paste("gam", name, sep = '_'), sep ='/')
+o2.dir
 
 names(train.gam)
+length(names(train.gam))
 
 # 4. Define predictor variables ----
 
-pred.vars <- c("Days_10N",
-               "Min_Monthly_Nitrate",
+pred.vars <- c("Days_10N" ,
+               "Min_Monthly_Nitrate" ,
                "Max_Monthly_Nitrate",
                "Mean_Monthly_Nitrate",
-               "Mean_Monthly_Upwelling_Nitrate",
-               "Max_Monthly_Anomaly_Nitrate" ,
-               "Mean_Monthly_Summer_Nitrate"  ,      
-               "Mean_Monthly_Temp"  ,
+               "Mean_Monthly_Upwelling_Nitrate" ,
+               "Max_Monthly_Anomaly_Nitrate"  ,     
+               "Mean_Monthly_Summer_Nitrate" ,
+               "Mean_Monthly_Temp" ,
                "Mean_Monthly_Summer_Temp" ,
-               "MHW_Upwelling_Days"  ,               
-               "Min_Monthly_Anomaly_Temp"   ,        
+               "MHW_Upwelling_Days" ,               
+               "Min_Monthly_Anomaly_Temp" ,
                "Max_Monthly_Anomaly_Upwelling_Temp",
-               "Min_Monthly_Temp"  ,                 
-               "Mean_Monthly_Upwelling_Temp",        
-               "wh.95",                             
-               "wh.max",                             
-               "npgo_mean",
-               "mei_mean",                    
+               "Min_Monthly_Temp" ,
+               "Mean_Monthly_Upwelling_Temp" ,      
+               "mean_depth" ,
+               "mean_prob_of_rock" ,
+               #"mean_slope"  ,
+               "wh_max" ,
+               "wh_mean"  ,
+               #"mean_waveyear"  ,
+               "wh_95prc" ,                       
+               "Mean_Monthly_NPP" ,
+               "Max_Monthly_NPP_Upwelling" ,
+               #"log_den_NERLUE" ,
                "log_den_MESFRAAD" ,
-               "log_den_STRPURAD" ,                 
-               "log_den_PYCHEL" ,                   
-               "log_den_HALRUF",
-               "log_Days_16C",                      
-               "log_npp.mean" )
+               "log_den_STRPURAD" ,
+               "log_den_PYCHEL"  ,
+               #"log_den_HALRUF" ,
+               #"log_mean_vrm" ,                     
+               "log_Days_16C"  ,
+               "log_UBR_Mean"  ,
+               "log_UBR_Max"  ,
+               "log_Mean_Monthly_NPP_Upwelling" ,   
+               "log_Min_Monthly_NPP" )
 
-length(pred.vars) # 24
+length(pred.vars) # 29
 
 
 
@@ -303,11 +316,11 @@ model.set <- generate.model.set(use.dat = train.gam,
                                 test.fit = model.v1,
                                 pred.vars.cont = pred.vars,
                                 #smooth.smooth.interactions = c("depth_mean", "wh.max", "wh.95"),
-                                max.predictors = 6,
-                                cov.cutoff = 0.7, # cut off for correlations
+                                max.predictors = 7,
+                                cov.cutoff = 0.65, # cut off for correlations
                                 #pred.vars.fact = fact.vars,
                                 #linear.vars="Distance",
-                                k=3,
+                                k=4,
                                 null.terms = "s(site_name, zone, bs = 're') +
                                 s(year, bs = 're')")
 
@@ -395,21 +408,23 @@ ggsave(namep, device = 'png', path = o2.dir)
 out.i <- read.csv(paste(o2.dir, "best_models.csv", sep ='/')) %>%
   glimpse()
 
+nrow(out.i)
+
 #### gam1 ----
 
-subname <- "4"
+subname <- "1"
 
 best.model.name=as.character(out.i$modname[4])
 best.model <- out.list$success.models[[best.model.name]]
-best.model <- print(out.i$formula[4])
+best.model <- print(out.i$formula[1])
 
 gam1 <- gam(formula = log_den_NERLUE ~ s(log_Days_16C, k = 3, bs = "cr") + 
-              s(log_den_STRPURAD, k = 4, bs = "cr") + 
+              s(log_UBR_Max, k = 4, bs = "cr") + 
               s(Max_Monthly_Nitrate, k = 6, bs = "cr") + 
-              s(Mean_Monthly_NPP, k = 6, bs = "cr") + 
+              s(mean_depth, k = 6, bs = "cr") + 
+              s(MHW_Upwelling_Days, k = 6, bs = "cr") +
               s(mean_prob_of_rock, k = 6, bs = "cr") +
-              #s(mean_prob_of_rock, k = 6, bs = "cr") +
-              s(mean_waveyear, k = 6, bs = "cr") +
+              s(wh_max, k = 6, bs = "cr") +
               s(site_name, zone, bs = "re") + 
               s(year, bs = "re"), 
             family = tw(), data = train.gam, method = "REML")
@@ -424,6 +439,63 @@ gam.check(gam1)
 par(mfrow=c(3,3),mar=c(2,4,3,1))
 visreg(gam1)
 dev.off()
+
+
+# GAM 2 ----
+best.model <- print(out.i$formula[2])
+
+gam1 <- gam(formula = log_den_NERLUE ~ s(log_Days_16C, k = 3, bs = "cr") + 
+              s(log_UBR_Max, k = 4, bs = "cr") + 
+              s(Max_Monthly_Nitrate, k = 6, bs = "cr") + 
+              s(mean_depth, k = 6, bs = "cr") + 
+              s(Mean_Monthly_NPP, k = 6, bs = "cr") +
+              s(mean_prob_of_rock, k = 6, bs = "cr") +
+              s(wh_max, k = 6, bs = "cr") +
+              s(site_name, zone, bs = "re") + 
+              s(year, bs = "re"), 
+            family = tw(), data = train.gam, method = "REML")
+
+
+
+gam1$aic
+gam1$deviance
+summary(gam1)
+gam.check(gam1)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(gam1)
+dev.off()
+
+
+# GAM 3 ----
+best.model <- print(out.i$formula[3])
+
+gam1 <- gam(formula = log_den_NERLUE ~ s(log_Days_16C, k = 3, bs = "cr") + 
+              s(log_UBR_Max, k = 4, bs = "cr") + 
+              s(Max_Monthly_Nitrate, k = 6, bs = "cr") + 
+              s(mean_depth, k = 6, bs = "cr") + 
+              s(Mean_Monthly_NPP, k = 6, bs = "cr") +
+              s(mean_prob_of_rock, k = 6, bs = "cr") +
+              s(wh_max, k = 6, bs = "cr") +
+              s(site_name, zone, bs = "re") + 
+              s(year, bs = "re"), 
+            family = tw(), data = train.gam, method = "REML")
+
+
+
+gam1$aic
+gam1$deviance
+summary(gam1)
+gam.check(gam1)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(gam1)
+dev.off()
+
+
+
+
+
 
 # png(file=paste(o.dir, paste(name,subname,'logden_NERLUE',"mod_fits.png",sep="_"), sep ='/'))
 # par(mfrow=c(3,3),mar=c(2,4,3,1))
