@@ -197,7 +197,7 @@ no_submodels
 submodels <- paste(1:no_submodels)
 
 submodel_names <- paste("bm", submodels, sep = '')
-
+submodel_names
 
 ### 2.3. Set number of folds ----
 no_folds <- 20
@@ -205,6 +205,10 @@ no_folds <- 20
 
 ### 2.4. Set data frame to save summary stats ----
 overall.summary <- data.frame()
+
+
+### Standard error function ----
+std.error <- function(x) sd(x)/sqrt(length(x))
 
 
 # 3. LOOP ----
@@ -426,7 +430,8 @@ for (i in 1:no_submodels){
     pivot_longer(cols = dev.exp:rmse, names_to = "summary_stat", values_to = "values") %>%
     mutate_at(vars(id, summary_stat), list(as.factor)) %>%
     group_by(summary_stat) %>%
-    summarise(mean_stat = mean(values)) %>%
+    summarise(mean_stat = mean(values),
+              se_stat = std.error(values)) %>%
     mutate(submodel = submodel_names[i]) %>%
     mutate_at(vars(submodel), list(as.factor)) %>%
     glimpse()
@@ -448,7 +453,7 @@ head(overall.summary)
 
 overall.summary <- na.omit(overall.summary)
 
-#write.csv(overall.summary, paste(d.dir, "gam_V4", "best_models_summary_stats.csv", sep ='/'))
+write.csv(overall.summary, paste(o.dir, "gam_V7", "best_models_CV_summary_stats.csv", sep ='/'))
 
 
 
@@ -468,7 +473,7 @@ p
 
 # save plot --
 
-#ggsave(plot = p, filename = "best_models_summary_stats.png", device = "png", path = paste(d.dir, "gam_V4", sep ='/'))
+#ggsave(plot = p, filename = "best_models_CV_summary_stats.png", device = "png", path = paste(o.dir, "gam_V7", sep ='/'))
 
 
 # 6. Compute best statistics ----
@@ -857,6 +862,8 @@ head(overall.summary)
 
 #write.csv(overall.summary, paste(k.dir, "best_models_CV_summary_stats_added_vars.csv", sep ='/'))
 
+overall.summary <- read.csv(paste(k.dir, "best_models_CV_summary_stats_added_vars.csv", sep ='/')) %>%
+  glimpse()
 
 
 # 5. PLOT SUMMARY STATS FOR BEST MODELS ----
