@@ -222,7 +222,7 @@ test.gam  <- dat2[-inTraining,]
 ### 2.1. Load best model csv ----
 best_mods <- read.csv(paste(o.dir, "STRPURAD_best_models.csv", sep ='/')) 
 # head(best_mods)
-# nrow(best_mods)
+nrow(best_mods)
 # 
 # bm_name <- best_mods$modname[1]
 # bm_name
@@ -294,48 +294,76 @@ dev.off()
 
 # 10. Predict to compare to observed ----
 
-# testdata <- dat2 %>%
-#   dplyr::select("log_den_STRPURAD", 
-#                 "log_mean_vrm",
-#                 "log_UBR_Max",
-#                 "Max_Monthly_Nitrate",    
-#                 "mean_depth",
-#                 "mean_prob_of_rock",
-#                 "wh_max",
-#                 log_den_NERLUE,
-#                 site_name, zone, year)
-# 
-# head(testdata)
-# 
-# 
-# fits <- predict.gam(gam5.1, newdata=testdata, type='response', se.fit=T)
+testdata <- test.gam %>%
+  dplyr::select(log_den_STRPURAD,
+                Max_Monthly_Anomaly_Upwelling_Temp,
+                Days_10N,
+                mean_prob_of_rock,
+                Max_Monthly_NPP_Upwelling,
+                mean_depth,
+                log_Min_Monthly_NPP,
+                log_den_NERLUE,
+                site_name, zone, year)
+
+head(testdata)
+
+
+fits <- predict.gam(gam2.3, newdata=testdata, type='response', se.fit=T)
+
+
+predicts.all <-  testdata %>% data.frame(fits)%>%
+  #group_by(survey_year)%>% #only change here
+  #summarise(response=mean(fit),se.fit=mean(se.fit))%>%
+  ungroup() %>%
+  glimpse()
+
+
+# Plot observed vs. predicted ----
+library(ggpmisc)
+
+my.formula <- y ~ x
+
+p <- ggplot(predicts.all, aes(x = fit, y = log_den_STRPURAD)) +
+  geom_smooth(method = "lm", se=FALSE, color="black", formula = my.formula) +
+  stat_poly_eq(formula = my.formula, 
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+               parse = TRUE) +         
+  geom_point() +
+  labs(x='Predicted', y='Observed', title='STRPURAD') +
+  theme_bw() +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14))
+p
+
 
 
 ### predict average kelp per year ----
-predicts.year = testdata%>%data.frame(fits)%>%
+
+
+predicts.year = testdata%>%data.frame(fits)%>% #glimpse()
   group_by(year)%>% #only change here
-  summarise(response=mean(fit, na.rm = T),se.fit=mean(se.fit, na.rm = T))%>%
-  ungroup()
+  summarise(response=mean(fit, na.rm = T),
+            se.fit=mean(se.fit, na.rm = T),
+            observed = mean(log_den_STRPURAD, na.rm = T))%>%
+  ungroup() %>%
+  glimpse()
 
+predicts.year <- as.data.frame(predicts.year)
 
-ggmod.year <- ggplot(aes(x=year,y=response,fill=year), data=predicts.year) +
-  ylab(" ")+
+ggmod.year <- ggplot(predicts.year) +
+  geom_bar(aes(x = year, y = response,  fill = year,), stat = "identity") +
+  geom_line(aes(x=year,y=observed), color = "red", size = 2, group =1) +
+  #scale_y_continuous(sec.axis = sec_axis(~.*1,name="Observed log purple sea urchin density")) +
+  ylab("Log density STRPURAD")+
   xlab('survey_year')+
-  #   ggtitle(substitute(italic(name)))+
-  scale_fill_viridis(discrete = T) +
-  #scale_fill_manual(values=c("light blue", "blue", "dark blue", "black", "dark red", "red", "orange", "green")) +
-  #scale_fill_manual(labels = c("Fished", "No-take"),values=c("red", "black"))+
-  #scale_colour_manual(labels = c("Fished", "No-take"),values=c("red", "black"))+
-  #scale_x_discrete(labels = c("2010", "2011", "2016", "2017", "2018", "2019", "2020"),limits = rev(levels(predicts.year$survey_year)))+
-  #scale_x_discrete(labels = c("2010", "2011", "2016", "2017", "2018", "2019", "2020")) +
-  geom_bar(stat = "identity")+
-  geom_errorbar(aes(ymin = response-se.fit,ymax = response+se.fit),width = 0.5) +
+  geom_errorbar(aes(x = year, y = response, ymin = response-se.fit,ymax = response+se.fit),width = 0.5) +
+  scale_fill_viridis(option = "E", discrete = T, direction = 1) +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, h = 1))
-#Theme1+
-#annotate("text", x = -Inf, y=Inf, label = "(a)",vjust = 1, hjust = -.1,size=5)+
-#annotate("text", x = -Inf, y=Inf, label = "   Dosinia subrosea",vjust = 1, hjust = -.1,size=5,fontface="italic")
-ggmod.year
+  theme(axis.text.x = element_text(size = 12, angle = 45, h = 1),
+        axis.text.y = element_text(size = 12),
+        axis.title = element_text(size = 14))
+
+ggmod.year 
 
 
 ###
@@ -409,7 +437,7 @@ levels(pred.obs.all$zone)
 ggplot(pred.obs.all, aes(x = year, y = latitude, color = values)) +
   geom_jitter(size = 4, pch = 16) +
   labs(x = 'Year', y = 'Latitude') +
-  facet_wrap(~type) +
+  facet_wrap(type~zone) +
   scale_color_viridis() +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, h = 1))
