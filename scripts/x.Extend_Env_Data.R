@@ -877,6 +877,181 @@ writeRaster(r.stack, paste(o3.dir, paste(variable, "extended_stack.tif", sep='_'
 ###
 
 
+# * MIN MONTHLY TEMP ----
+
+# Clear environment ----
+rm(list=ls())
+
+# directories ----
+m.dir <- here()
+# depth dir
+depth.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/Environmental/Seagrant_OPC_Environmental_Data/Depth"
+# temp dir
+env.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/Environmental/Seagrant_OPC_Environmental_Data/Temperature"
+# output dir
+o.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/Environmental/Extended_variables"
+
+
+
+
+# set output dir ----
+o2.dir <- paste(o.dir, "Temperature", sep = '/')
+o2.dir
+
+# LOOP ----
+
+# variable to extend --
+variable <- "Min_Monthly_Temp"
+
+# create directory for outputs --
+dir.create(paste(o2.dir, variable, sep ='/'))
+
+
+## load depth data ----
+
+d <- raster(paste(depth.dir, "depth_allCA_wInterp_wCIN_1km_30depth_latlon.tif", sep ='/'))
+plot(d)
+d
+
+
+## load nitrate data ----
+env.rast <- stack(paste(env.dir, "Min_Monthly_Temp.tif", sep = '/'))
+#plot(env.rast)
+env.rast
+plot(env.rast[[1]])
+
+
+## resample depth to env variable ----
+d <- raster::resample(d, env.rast)
+
+
+## make depth template ----
+d
+d[d < 0] <- 1
+plot(d)
+
+
+d.mat <- as.matrix(d)
+d.df <- raster::as.data.frame(d, xy = T)
+
+
+
+# get years --
+rast.years <- paste(1998:2021)
+length(rast.years)
+
+
+for(i in 1:length(rast.years)) {
+  
+  ### get waves ----
+  
+  rast.year <- env.rast[[i]]
+  plot(rast.year)
+  
+  # rast.year[rast.year == 0] <- NA
+  # plot(rast.year)
+  
+  
+  rast.mat <- as.matrix(rast.year)
+  rast.df <- raster::as.data.frame(rast.year, xy = T)
+  
+  
+  #### MATCH points ----
+  
+  ## Remove NAs from data
+  d.df2 <- na.omit(d.df) # depth df
+  rast.df2 <- na.omit(rast.df) 
+  
+  # Check how many wave data cells ----
+  rast.cells <- length(rast.df2$x)
+  
+  rast.df2$index <- paste(1:rast.cells)
+  head(rast.df2)
+  
+  
+  # transform df to matrices ----
+  d.v <- as.matrix(d.df2)
+  rast.v <- as.matrix(rast.df2)
+  
+  
+  # MATCH POINTS ----
+  matched <- matchpt(d.v[,1:2], rast.v[,1:2])
+  length(matched$index)
+  
+  # add coordinates to depth points ----
+  d.df3 <- cbind(d.df2[,1:2], matched)
+  head(d.df3)
+  glimpse(d.df3)
+  
+  
+  ## Join to depth data ----
+  head(rast.df2)
+  rast.df2$index <- as.integer(rast.df2$index)
+  
+  df.join <- d.df3 %>%
+    left_join(rast.df2, by = "index") %>%
+    glimpse()
+  
+  
+  spg <- df.join
+  head(spg)
+  spg <- spg[,c(1:2,7)]
+  
+  coordinates(spg) <- ~ x.x + y.x
+  gridded(spg) <- TRUE
+  rasterDF <- raster(spg)
+  rasterDF
+  plot(rasterDF)
+  proj4string(rasterDF) <- proj4string(rast.year)
+  
+  raster_name <- paste(paste(variable, rast.years[i], sep = '_'), "tif", sep = '.')
+  
+  writeRaster(rasterDF, paste(o2.dir, variable, raster_name, sep ='/'), overwrite = T)
+  
+}
+
+
+## Stack the extended variable and save ----
+
+# load raster data --
+o3.dir <- paste(o2.dir, variable, sep ='/')
+
+x.files <- dir(o3.dir)
+x.files
+# list files in source --
+x.files <- list.files(o3.dir, pattern = '.tif$', full.names = TRUE)
+x.files
+length(x.files)
+# list names to load onto the Environment --
+names.list <- list.files(o3.dir, pattern = '.tif$')
+names.list <- str_replace(names.list, ".tif$", "")
+length(names.list)
+names.list
+
+# load csv files as a list --
+rfiles <- lapply(x.files, rast) # this is a list
+rfiles[[1]]
+plot(rfiles[[1]])
+
+# stack them ---
+r.stack <- c()
+
+# use do call to create a raster otherwise it creates a list
+r.stack <- do.call("c", rfiles)
+
+# write stack
+writeRaster(r.stack, paste(o3.dir, paste(variable, "extended_stack.tif", sep='_'), sep='/'))
+
+
+###
+
+
+###
+
+
+###
+
+
 # * MIN MONTHLY ANOMALY TEMP ----
 
 # Clear environment ----
@@ -1050,6 +1225,182 @@ writeRaster(r.stack, paste(o3.dir, paste(variable, "extended_stack.tif", sep='_'
 
 
 ###
+
+
+# * MAX MONTHLY ANOMALY SUMMER NITRATE ----
+
+# Clear environment ----
+rm(list=ls())
+
+# directories ----
+m.dir <- here()
+# depth dir
+depth.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/Environmental/Seagrant_OPC_Environmental_Data/Depth"
+# env dir
+env.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/Environmental/Seagrant_OPC_Environmental_Data/Nitrate"
+# output dir
+o.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/Environmental/Extended_variables"
+
+
+
+
+# set output dir ----
+o2.dir <- paste(o.dir, "Nitrate", sep = '/')
+o2.dir
+
+# LOOP ----
+
+# variable to extend --
+variable <- "Max_Monthly_Anomaly_Summer_Nitrate"
+
+# create directory for outputs --
+dir.create(paste(o2.dir, variable, sep ='/'))
+
+
+## load depth data ----
+
+d <- raster(paste(depth.dir, "depth_allCA_wInterp_wCIN_1km_30depth_latlon.tif", sep ='/'))
+plot(d)
+d
+
+
+## load nitrate data ----
+env.rast <- stack(paste(env.dir, "Max_Monthly_Anomaly_Summer_Nitrate.tif", sep = '/'))
+#plot(env.rast)
+env.rast
+plot(env.rast[[1]])
+
+
+## resample depth to env variable ----
+d <- raster::resample(d, env.rast)
+
+
+## make depth template ----
+d
+d[d < 0] <- 1
+plot(d)
+
+
+d.mat <- as.matrix(d)
+d.df <- raster::as.data.frame(d, xy = T)
+
+
+
+# get years --
+rast.years <- paste(1998:2021)
+length(rast.years)
+
+
+for(i in 1:length(rast.years)) {
+  
+  ### get waves ----
+  
+  rast.year <- env.rast[[i]]
+  plot(rast.year)
+  
+  # rast.year[rast.year == 0] <- NA
+  # plot(rast.year)
+  
+  
+  rast.mat <- as.matrix(rast.year)
+  rast.df <- raster::as.data.frame(rast.year, xy = T)
+  
+  
+  #### MATCH points ----
+  
+  ## Remove NAs from data
+  d.df2 <- na.omit(d.df) # depth df
+  rast.df2 <- na.omit(rast.df) 
+  
+  # Check how many wave data cells ----
+  rast.cells <- length(rast.df2$x)
+  
+  rast.df2$index <- paste(1:rast.cells)
+  head(rast.df2)
+  
+  
+  # transform df to matrices ----
+  d.v <- as.matrix(d.df2)
+  rast.v <- as.matrix(rast.df2)
+  
+  
+  # MATCH POINTS ----
+  matched <- matchpt(d.v[,1:2], rast.v[,1:2])
+  length(matched$index)
+  
+  # add coordinates to depth points ----
+  d.df3 <- cbind(d.df2[,1:2], matched)
+  head(d.df3)
+  glimpse(d.df3)
+  
+  
+  ## Join to depth data ----
+  head(rast.df2)
+  rast.df2$index <- as.integer(rast.df2$index)
+  
+  df.join <- d.df3 %>%
+    left_join(rast.df2, by = "index") %>%
+    glimpse()
+  
+  
+  spg <- df.join
+  head(spg)
+  spg <- spg[,c(1:2,7)]
+  
+  coordinates(spg) <- ~ x.x + y.x
+  gridded(spg) <- TRUE
+  rasterDF <- raster(spg)
+  rasterDF
+  plot(rasterDF)
+  proj4string(rasterDF) <- proj4string(rast.year)
+  
+  raster_name <- paste(paste(variable, rast.years[i], sep = '_'), "tif", sep = '.')
+  
+  writeRaster(rasterDF, paste(o2.dir, variable, raster_name, sep ='/'), overwrite = T)
+  
+}
+
+
+## Stack the extended variable and save ----
+
+# load raster data --
+o3.dir <- paste(o2.dir, variable, sep ='/')
+
+x.files <- dir(o3.dir)
+x.files
+# list files in source --
+x.files <- list.files(o3.dir, pattern = '.tif$', full.names = TRUE)
+x.files
+length(x.files)
+# list names to load onto the Environment --
+names.list <- list.files(o3.dir, pattern = '.tif$')
+names.list <- str_replace(names.list, ".tif$", "")
+length(names.list)
+names.list
+
+# load csv files as a list --
+rfiles <- lapply(x.files, rast) # this is a list
+rfiles[[1]]
+plot(rfiles[[1]])
+
+# stack them ---
+r.stack <- c()
+
+# use do call to create a raster otherwise it creates a list
+r.stack <- do.call("c", rfiles)
+
+# write stack
+writeRaster(r.stack, paste(o3.dir, paste(variable, "extended_stack.tif", sep='_'), sep='/'))
+
+
+###
+
+
+###
+
+
+###
+
 
 # * MIN MONTHLY NITRATE ----
 
