@@ -61,7 +61,7 @@ m.dir <- here()
 d.dir <- here('data')
 k.dir <- here('outputs_nc_rcca')
 o.dir <- paste(k.dir, "gam_V7", sep ='/') # kelp model results
-u.dir <- paste('outputs_nc_rcca_urchins', "gam_urchins4", sep ='/') # urchin model results
+u.dir <- paste('outputs_nc_rcca_urchins', "gam_urchins4_120m", sep ='/') # urchin model results
 # rcca.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/North_Coast_w_RCCA/raw_data"
 # dd.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/Extract_env_data/nc.rcca.outputs"
 
@@ -214,13 +214,13 @@ bm <- read.csv(paste(o.dir, "best_models.csv", sep ='/'))
 
 gam1 <- gam(formula = log_den_NERLUE ~ 
                 s(log_den_STRPURAD, k = 6, bs = "cr") +
-                s(log_Days_16C, k = 3, bs = "cr") + 
-                #s(Mean_Monthly_Upwelling_Temp, k = 3, bs = "cr") + 
+                #s(log_Days_16C, k = 3, bs = "cr") + 
+                s(Mean_Monthly_Upwelling_Temp, k = 3, bs = "cr") + 
                 s(Max_Monthly_Nitrate, k = 6, bs = "cr") +
                 s(log_UBR_Max, k = 10, bs = "cr") +
                 s(wh_mean, k = 10, bs = "cr") +
-                #s(mean_depth, k = 4, bs = "cr") +
-                #s(Mean_Monthly_NPP, k = 6, bs = "cr") +
+                s(mean_depth, k = 4, bs = "cr") +
+                s(Mean_Monthly_NPP, k = 6, bs = "cr") +
                 s(site_name, zone, bs = "re") + 
                 s(year, bs = "re"), 
               family = tw(), data = dat2, method = "REML")
@@ -253,17 +253,20 @@ dev.off()
 
 testdata <- dat2 %>%
   dplyr::select("log_den_STRPURAD", 
-                "log_Days_16C",
+                #"log_Days_16C",
+                'Mean_Monthly_Upwelling_Temp',
                 "log_UBR_Max",
                 "Max_Monthly_Nitrate",    
                 "wh_mean",
+                'mean_depth',
+                'Mean_Monthly_NPP',
                 log_den_NERLUE,
                 site_name, zone, year)
 
 head(testdata)
 
 
-fits <- predict.gam(gam5.1, newdata=testdata, type='response', se.fit=T)
+fits <- predict.gam(gam1, newdata=testdata, type='response', se.fit=T)
 
 
 ### predict average kelp per year ----
@@ -401,15 +404,15 @@ depth.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Da
 
 names(dat2)
 
-depth <- rast(paste(depth.dir, "depth_mean_nc_all_wInterp_300m_30m.tif", sep ='/'))
+depth <- rast(paste(depth.dir, "depth_mean_nc_120res_30depth_latlon.tif", sep ='/'))
 plot(depth)
 
 n.extent <- ext(depth)
 
-crs1 <- "epsg:4326"
-d2 <- project(depth, crs1)
-
-n.extent <- ext(d2)
+# crs1 <- "epsg:4326"
+# d2 <- project(depth, crs1)
+# 
+# n.extent <- ext(d2)
 
 
 ## Get rock ----
@@ -417,15 +420,16 @@ sub.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data
 
 dir(sub.dir)
 
-rock <- rast(paste(sub.dir, "prob_rock_nc_MASKED_LatLong_all_300m_wInterp.tif", sep ='/'))
+rock <- rast(paste(sub.dir, "prob_rock_mean_nc_120res_30depth_latlon.tif", sep ='/'))
 rock 
 
 # crop to NC --
-rock2 <- crop(rock, ext(d2))
-plot(rock2)
-
-rock3 <- resample(rock2, d2)
-plot(rock3)
+test <- c(depth, rock)
+# rock2 <- crop(rock, ext(depth))
+# plot(rock2)
+# 
+# rock3 <- resample(rock2, d2)
+# plot(rock3)
 
 
 ### Get Env predictors  ----
@@ -443,11 +447,29 @@ max_nit2 <- crop(max_nit, n.extent)
 plot(max_nit2[[1]])
 
 # resample predictors to bathy ----
-max_nit3 <- resample(max_nit2, d2)
+max_nit3 <- resample(max_nit2, depth)
+plot(max_nit3[[1]])
 
 # mask predictors to bathy ----
-max_nit4 <- mask(max_nit3, d2)
+max_nit4 <- mask(max_nit3, depth)
 plot(max_nit4[[1]])
+
+
+### Get NPP predictors  ----
+npp <- rast(paste(re.dir, "NPP", "Mean_Monthly_NPP", "Mean_Monthly_NPP_extended_stack.tif", sep ='/'))
+npp
+
+# # crop to NC --
+npp2 <- crop(npp, n.extent)
+plot(npp2[[1]])
+
+# resample predictors to bathy ----
+npp3 <- resample(npp2, depth)
+plot(npp3[[1]])
+
+# mask predictors to bathy ----
+npp4 <- mask(npp3, depth)
+plot(npp4[[1]])
 
 
 ### Get Wave predictors  ----
@@ -470,10 +492,11 @@ wh2 <- crop(wh, n.extent)
 plot(wh2[[1]])
 
 # resample predictors to bathy ----
-wh3 <- resample(wh2, d2)
+wh3 <- resample(wh2, depth)
+plot(wh3[[1]])
 
 # mask predictors to bathy ----
-wh4 <- mask(wh3, d2)
+wh4 <- mask(wh3, depth)
 plot(wh4[[1]])
 
 
@@ -486,6 +509,7 @@ w2.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/
 
 ubr <- rast(paste(w2.dir, "UBR_Max_30m_NC.tif", sep ='/'))
 plot(ubr[[1]])
+ubr
 
 ubr <- project(ubr, rock)
 
@@ -500,10 +524,11 @@ ubr2 <- crop(ubr1, n.extent)
 plot(ubr2[[1]])
 
 # resample predictors to bathy ----
-ubr3 <- resample(ubr2, d2)
+ubr3 <- resample(ubr2, depth)
+plot(ubr3[[1]])
 
 # mask predictors to bathy ----
-ubr4 <- mask(ubr3, d2)
+ubr4 <- mask(ubr3, depth)
 plot(ubr4[[1]])
 
 ubr5 <- log(ubr4)
@@ -517,23 +542,24 @@ re.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/
 ## log_Days_16C --
 
 ### Get wh_mean predictors  ----
-d16c <- rast(paste(re.dir, "Temperature", "Days_16C", "Days_16C_extended_stack.tif", sep ='/'))
-d16c
+temp <- rast(paste(re.dir, "Temperature", "Mean_Monthly_Upwelling_Temp", "Mean_Monthly_Upwelling_Temp_extended_stack.tif", sep ='/'))
+temp
 
 # # crop to NC --
-d16c2 <- crop(d16c, n.extent)
-plot(d16c2[[1]])
+temp2 <- crop(temp, n.extent)
+plot(temp2[[1]])
 
 # resample predictors to bathy ----
-d16c3 <- resample(d16c2, d2)
+temp3 <- resample(temp2, depth)
+plot(temp3[[1]])
 
 # mask predictors to bathy ----
-d16c4 <- mask(d16c3, d2)
-plot(d16c4[[1]])
+temp4 <- mask(temp3, depth)
+plot(temp4[[1]])
 
 # log
-d16c5 <- log(d16c4 + 1)
-plot(d16c5[[11]])
+# temp5 <- log(temp4 + 1)
+# plot(temp5[[11]])
 
 
 ### Get urchins ----
@@ -542,10 +568,15 @@ plot(d16c5[[11]])
 urch.dir <- paste(u.dir, "predictions", sep ='/')
 urch.dir
 
-urchins <- rast(paste(urch.dir, "log_STRPURAD_preds_NC_V4_stack.tif", sep ='/'))
+urchins <- rast(paste(urch.dir, "log_STRPURAD_preds_NC_V4_120m_stack.tif", sep ='/'))
 urchins
 
 plot(urchins[[1]])
+max.u <- max(dat2$log_den_STRPURAD) # 8.936298
+
+# reclassify urchins to max limit
+urchins2 <- classify(urchins, cbind(max.u, Inf, max.u))
+plot(urchins2[[1]])
 
 ##
 
@@ -587,7 +618,7 @@ site.raster2 <- extend(site.raster, year1998)
 
 # ZONE ----
 
-zone.raster <- d2
+zone.raster <- depth
 names(zone.raster) <- 'zone'
 plot(zone.raster)
 levels(dat2$zone)
@@ -618,7 +649,7 @@ year.list <- paste(2004:2021)
 length(year.list)
 
 # make template raster of year ----
-year.raster <- classify(d2, cbind(-Inf, 0.1, 2004), right=FALSE)
+year.raster <- classify(depth, cbind(-Inf, 0.1, 2004), right=FALSE)
 plot(year.raster)
 names(year.raster) <- 'year'
 
@@ -629,11 +660,11 @@ names(year.raster) <- 'year'
 # outputs dir ----
 
 #o.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/Spatio_temporal_GAMs/outputs_nc_rcca/gam_V4/gam_5.1"
-preds.dir <- paste(o.dir, "preds", sep ='/')
+preds.dir <- paste(o.dir, "preds_120m", sep ='/')
 preds.dir
 
 # output for rasters scaled by rock 
-rock.preds.dir <- paste(o.dir, "rock_preds", sep ='/')
+rock.preds.dir <- paste(o.dir, "rock_preds_120m", sep ='/')
 rock.preds.dir
 
 # Version 3: V4_5.1.1_v3 : Using urchins3, which don't have VRM
@@ -643,8 +674,8 @@ rock.preds.dir
 for (i in 1:length(year.list)) {
   
   # 1. get urchins
-  urchin.rast <- urchins[[1]]
-  urchin.rast2 <- resample(urchin.rast, d2)
+  urchin.rast <- urchins2[[i]]
+  urchin.rast2 <- resample(urchin.rast, depth)
   
   # 2. stack with predictors for that year
   #env.raster <- c(d2, max_nit4[[i+6]], whmax.stack4[[i]], wymean.stack4[[i]])
@@ -652,7 +683,7 @@ for (i in 1:length(year.list)) {
   #env.raster <- c(d2, mean_up_T4[[i+6]], max_nit4[[i+6]], whmax.stack4[[i]], wymean.stack4[[i]])
   
   # V3
-  env.raster <- c(max_nit4[[i+6]], d16c5[[i+6]], wh4[[i]], ubr5[[i]])
+  env.raster <- c(depth, max_nit4[[i+6]], temp4[[i+6]], wh4[[i]], ubr5[[i]], npp4[[i+1]])
   
   preds1 <- c(urchin.rast2, env.raster)
   
@@ -670,10 +701,12 @@ for (i in 1:length(year.list)) {
   
   # name predictors 
   names(preds4) <- c("log_den_STRPURAD",
+                     "mean_depth",
                      "Max_Monthly_Nitrate"  , 
-                     "log_Days_16C", 
+                     "Mean_Monthly_Upwelling_Temp", 
                      "wh_mean",  
                      "log_UBR_Max",
+                     "Mean_Monthly_NPP",
                      "year", 
                      "zone",
                      "site_name")
@@ -699,15 +732,15 @@ for (i in 1:length(year.list)) {
   plot(year.prediction)
   
   # 7. save raw raster
-  name.raster <- paste(year.no, "log_Nereo_preds_NC_V7.tif", sep = '_')
+  name.raster <- paste(year.no, "log_Nereo_preds_NC_V7_120m.tif", sep = '_')
   writeRaster(year.prediction, paste(preds.dir, name.raster, sep = '/'))
   
   # 8. scale by rock
-  rock4 <- resample(rock3, year.prediction)
+  rock4 <- resample(rock, year.prediction)
   year.prediction2 <- rock4*year.prediction
   
   # 9. save rastr scaled by rock
-  name.raster.rock <- paste(year.no, "log_Nereo_preds_rock_NC_V7.tif", sep = '_')
+  name.raster.rock <- paste(year.no, "log_Nereo_preds_rock_NC_V7_120m.tif", sep = '_')
   #writeRaster(year.prediction, paste(preds.dir, "sp_predictions", paste(year.no, "logNereo_preds_NC.tif", sep = '_'), sep ='/'))
   writeRaster(year.prediction2, paste(rock.preds.dir, name.raster.rock, sep = '/'))
 }
@@ -727,7 +760,7 @@ for (i in 1:length(year.list)) {
 # preds.dir <- paste(o.dir, "sp_predictions_5.1.1_V3_rock", sep ='/')
 # preds.dir
 
-preds.dir <- paste(o.dir, "rock_preds", sep ='/')
+preds.dir <- paste(o.dir, "rock_preds_120m", sep ='/')
 preds.dir
 
 #preds.dir <- rock.preds.dir
@@ -760,23 +793,43 @@ names(preds.stack) <- paste("Nereo", paste(2004:2021), sep ='_')
 preds.stack
 
 # save
-#writeRaster(preds.stack, paste(preds.dir, "rock_stack_log_Nereo_NC_V7.tif", sep ='/'), overwrite = T)
+writeRaster(preds.stack, paste(preds.dir, "rock_stack_log_Nereo_NC_V7_120m.tif", sep ='/'), overwrite = T)
+
+# get csv --
+dfn <- as.data.frame(preds.stack, xy = T) %>% glimpse()
+
+write.csv(dfn, paste(preds.dir, "rock_stack_log_Nereo_NC_V7_120m.csv", sep ='/'))
+
+
+## Cap at max log_nerlue ----
+max.n <- max(dat2$log_den_NERLUE) # 6.216606
+preds.stack2 <- classify(preds.stack, cbind(max.n, Inf, max.n))
+plot(preds.stack2[[10]])
+
+# save
+writeRaster(preds.stack2, paste(preds.dir, "rock_stack_log_Nereo_NC_V7_120m_capped.tif", sep ='/'))
+
+# get csv --
+dfn <- as.data.frame(preds.stack2, xy = T) %>% glimpse()
+
+write.csv(dfn, paste(preds.dir, "rock_stack_log_Nereo_NC_V7_120m_capped.csv", sep ='/'))
+
 
 # get only  PRE MHW STABILITY ----
-preds.stack2 <- preds.stack[[1:10]]
-preds.stack2 
+preds.stack3 <- preds.stack2[[1:10]]
+preds.stack3 
 
 ### Calculate mean across years ----
 
 stability.stack <- c()
 
 # calculate mean across years
-mean.nereo <- mean(preds.stack2, na.rm = T)
+mean.nereo <- mean(preds.stack3, na.rm = T)
 plot(mean.nereo)
 
 
 # calculate sd across years
-sd.nereo <- app(preds.stack2, fun = sd, na.rm = T)
+sd.nereo <- app(preds.stack3, fun = sd, na.rm = T)
 plot(sd.nereo)
 
 
@@ -795,15 +848,19 @@ names(stability.stack) <- c("mean_nereo", "sd_nereo", "s_nereo", "s_index_nereo"
 plot(stability.stack)
 
 # save 
-#writeRaster(stability.stack, paste(preds.dir, "rock_Stabilty_PreMHW_calculations_Nereo_NC_V7.tif", sep ='/'), overwrite = T)
+#writeRaster(stability.stack, paste(preds.dir, "rock_Stabilty_PreMHW_calculations_Nereo_NC_V7_120m_capped.tif", sep ='/'), overwrite = T)
 
 ## get csv --
 
-st.df <- as.data.frame(stability.stack, xy = T) %>% glimpse()
-write.csv(st.df, paste(preds.dir, "rock_Stabilty_PreMHW_calculations_Nereo_NC_V7.csv", sep ='/'))
+st.df <- as.data.frame(stability.stack, xy = T) %>% 
+  mutate(s_nereo = replace(s_nereo, is.na(s_nereo), 0),
+         s_index_nereo = replace(s_index_nereo, is.na(s_index_nereo), 0)) %>%
+  glimpse()
 
-n.df <- as.data.frame(preds.stack, xy = T) %>% glimpse()
-write.csv(n.df, paste(preds.dir, "rock_log_Nereo_year_preds_V7.csv", sep ='/'))
+write.csv(st.df, paste(preds.dir, "rock_Stabilty_PreMHW_calculations_Nereo_NC_V7_120m_capped.csv", sep ='/'))
+
+# n.df <- as.data.frame(preds.stack, xy = T) %>% glimpse()
+# write.csv(n.df, paste(preds.dir, "rock_log_Nereo_year_preds_V7.csv", sep ='/'))
 
 
 

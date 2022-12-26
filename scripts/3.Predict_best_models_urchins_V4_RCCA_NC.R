@@ -474,30 +474,30 @@ depth.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Da
 
 names(dat2)
 
-depth <- rast(paste(depth.dir, "depth_mean_nc_all_wInterp_300m_30m.tif", sep ='/'))
+depth <- rast(paste(depth.dir, "depth_mean_nc_120res_30depth_latlon.tif", sep ='/'))
 plot(depth)
 
 n.extent <- ext(depth)
 
-crs1 <- "epsg:4326"
-d2 <- project(depth, crs1)
+# crs1 <- "epsg:4326"
+# d2 <- project(depth, crs1)
 
-n.extent <- ext(d2)
-
+# n.extent <- ext(d2)
+# n.extent
 
 ## Get rock ----
 sub.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/Data/Susbtrate_aggregated"
 
 dir(sub.dir)
 
-rock <- rast(paste(sub.dir, "prob_rock_nc_MASKED_LatLong_all_300m_wInterp.tif", sep ='/'))
+rock <- rast(paste(sub.dir, "prob_rock_mean_nc_120res_30depth_latlon.tif", sep ='/'))
 rock 
 
 # crop to NC --
-rock2 <- crop(rock, ext(d2))
+rock2 <- crop(rock, ext(depth))
 plot(rock2)
 
-rock3 <- resample(rock2, d2)
+rock3 <- resample(rock2, depth)
 plot(rock3)
 
 
@@ -512,16 +512,18 @@ re2.dir <- paste(re.dir, "Nitrate", "Days_10N", sep ='/')
 ### Get nitrate predictors  ----
 nit_10 <- rast(paste(re2.dir, "Days_10N_extended_stack.tif", sep ='/'))
 nit_10
+plot(nit_10[[1]])
 
 # # crop to NC --
 nit_102 <- crop(nit_10, n.extent)
 plot(nit_102[[1]])
 
 # resample predictors to bathy ----
-nit_103 <- resample(nit_102, d2)
+nit_103 <- resample(nit_102, depth)
+plot(nit_103[[1]])
 
 # mask predictors to bathy ----
-nit_104 <- mask(nit_103, d2)
+nit_104 <- mask(nit_103, depth)
 plot(nit_104[[1]])
 
 
@@ -545,10 +547,11 @@ max_t2 <- crop(max_t, n.extent)
 plot(max_t2[[1]])
 
 # resample predictors to bathy ----
-max_t3 <- resample(max_t2, d2)
+max_t3 <- resample(max_t2, depth)
+plot(max_t3[[1]])
 
 # mask predictors to bathy ----
-max_t4 <- mask(max_t3, d2)
+max_t4 <- mask(max_t3, depth)
 plot(max_t4[[1]])
 
 
@@ -573,10 +576,11 @@ max_npp2 <- crop(max_npp, n.extent)
 plot(max_npp2[[1]])
 
 # resample predictors to bathy ----
-max_npp3 <- resample(max_npp2, d2)
+max_npp3 <- resample(max_npp2, depth)
+plot(max_npp3[[1]])
 
 # mask predictors to bathy ----
-max_npp4 <- mask(max_npp3, d2)
+max_npp4 <- mask(max_npp3, depth)
 plot(max_npp4[[1]])
 
 
@@ -595,10 +599,11 @@ min_npp2 <- crop(min_npp, n.extent)
 plot(min_npp2[[1]])
 
 # resample predictors to bathy ----
-min_npp3 <- resample(min_npp2, d2)
+min_npp3 <- resample(min_npp2, depth)
+plot(min_npp3[[1]])
 
 # mask predictors to bathy ----
-min_npp4 <- mask(min_npp3, d2)
+min_npp4 <- mask(min_npp3, depth)
 plot(min_npp4[[1]])
 
 # log pred ----
@@ -644,7 +649,7 @@ site.raster2 <- extend(site.raster, year1998)
 
 # zone ----
 
-zone.raster <- d2
+zone.raster <- depth
 names(zone.raster) <- 'zone'
 plot(zone.raster)
 levels(dat2$zone)
@@ -676,9 +681,11 @@ year.list <- paste(2004:2021)
 length(year.list)
 
 # make template raster of year ----
-year.raster <- classify(d2, cbind(-Inf, 0.1, 2004), right=FALSE)
+year.raster <- classify(depth, cbind(-Inf, 0.1, 2004), right=FALSE)
 plot(year.raster)
 names(year.raster) <- 'year'
+
+
 
 # make zone raster ---- 
 
@@ -688,7 +695,8 @@ names(year.raster) <- 'year'
 
 #o.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/Spatio_temporal_GAMs/outputs_nc_rcca/gam_V4/gam_5.1"
 
-preds.dir <- paste(o.dir, "predictions", sep ='/')
+#preds.dir <- paste(o.dir, "predictions", sep ='/')
+preds.dir <- paste(u.dir, "gam_urchins4_120m", "predictions", sep ='/')
 preds.dir
 
 # Version 3: V4_5.1.1_v3 : Using urchins3, which don't have VRM
@@ -699,7 +707,7 @@ for (i in 1:length(year.list)) {
   
   
   # 1. stack with predictors for that year
-  env.raster <- c(d2, rock3, nit_104[[6+i]], max_t4[[6+i]], max_npp4[[1+i]], min_npp5[[1+i]])
+  env.raster <- c(depth, rock3, nit_104[[6+i]], max_t4[[6+i]], max_npp4[[1+i]], min_npp5[[1+i]])
   
   # 2. get year and stack it
   year.no <- as.numeric(year.list[i])
@@ -746,8 +754,13 @@ for (i in 1:length(year.list)) {
   plot(year.prediction)
   
   # 7. save raw raster
-  name.raster <- paste(year.no, "log_STRPURAD_preds_NC_V4.tif", sep = '_')
+  name.raster <- paste(year.no, "log_STRPURAD_preds_NC_V4_120m.tif", sep = '_')
   writeRaster(year.prediction, paste(preds.dir, name.raster, sep = '/'))
+  
+  # save data frame
+  dfu <- as.data.frame(year.prediction, xy = T)
+  name.csv <- paste(year.no, "log_STRPURAD_preds_NC_V4_120m.csv", sep = '_')
+  write.csv(dfu, paste(paste(preds.dir, name.csv, sep = '/')))
 
               
 }
@@ -760,6 +773,10 @@ for (i in 1:length(year.list)) {
 # Stack all year predictions ----
 # load raster data --
 preds.dir
+
+# preds.dir <- "C:/Users/anita/Documents/Git_Repositories/Spatio-temporal_kelp_NC/outputs_nc_rcca_urchins/gam_urchins4_120m/predictions"
+# dir(preds.dir)
+
 
 n.files <- dir(preds.dir)
 # list files in source --
@@ -792,7 +809,11 @@ names.s
 names(preds.stack) <- names.s
 names(preds.stack) 
 
-#writeRaster(preds.stack, paste(o.dir, "predictions", "log_STRPURAD_preds_NC_V4_stack.tif", sep = '/'))
+#writeRaster(preds.stack, paste(preds.dir, "log_STRPURAD_preds_NC_V4_120m_stack.tif", sep = '/'))
+
+# dfu <- as.data.frame(preds.stack, xy = T) %>% glimpse()
+# 
+# write.csv(dfu, paste(preds.dir, "log_STRPURAD_preds_NC_V4_120m_stack.csv", sep = '/'))
 
 
 ###
