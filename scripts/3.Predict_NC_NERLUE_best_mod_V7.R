@@ -1015,3 +1015,101 @@ preds.dir
 
 stability.stack <- rast(paste(preds.dir, "Stabilty_calculations_Nereo_NC_gam_V4_5.1.1_V2_rock.tif", sep ='/'))
 plot(stability.stack[[1]])
+
+
+
+###
+
+### TESTING WITH CC PREDS ----
+
+dat2 <- dat2 %>%
+  dplyr::filter(year != 2006) %>%
+  glimpse()
+
+train.gam <- train.gam %>%
+  dplyr::filter(year != 2006) %>%
+  glimpse()
+
+# 4. Run GAM  ----
+
+gam1 <- gam(formula = log_den_NERLUE ~ 
+              s(log_den_STRPURAD, k = 6, bs = "cr") +
+              #s(log_Days_16C, k = 3, bs = "cr") + 
+              #s(Mean_Monthly_Upwelling_Temp, k = 3, bs = "cr") + 
+              s(Min_Monthly_Anomaly_Temp, k = 3, bs = "cr") +
+              #s(Max_Monthly_Nitrate, k = 6, bs = "cr") +
+              s(Min_Monthly_Nitrate, k = 6, bs = "cr") +
+              s(log_UBR_Max, k = 10, bs = "cr") +
+              s(wh_mean, k = 10, bs = "cr") +
+              s(mean_depth, k = 4, bs = "cr") +
+              s(Mean_Monthly_NPP, k = 6, bs = "cr") +
+              s(site_name, zone, bs = "re") + 
+              s(year, bs = "re"), 
+            family = tw(), data = train.gam, method = "REML")
+
+
+# 5. Check GAM ----
+gam1$aic
+gam1$deviance
+summary(gam1)
+gam.check(gam1)
+
+# visualize rensponse 
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(gam1)
+dev.off()
+
+testdata <- dat2 %>%
+  dplyr::select("log_den_STRPURAD", 
+                #"log_Days_16C",
+                'Mean_Monthly_Upwelling_Temp',
+                "log_UBR_Max",
+                "Max_Monthly_Nitrate",    
+                "wh_mean",
+                'mean_depth',
+                'Mean_Monthly_NPP',
+                log_den_NERLUE,
+                site_name, zone, year)
+
+head(testdata)
+
+
+fits <- predict.gam(gam1, newdata=testdata, type='response', se.fit=T)
+
+
+### predict average kelp per year ----
+predicts.year = testdata%>%data.frame(fits)%>% #glimpse()
+  group_by(year)%>% #only change here
+  summarise(response=mean(fit, na.rm = T),
+            se.fit=mean(se.fit, na.rm = T),
+            observed = mean(log_den_NERLUE, na.rm = T))%>%
+  ungroup() %>%
+  glimpse()
+
+predicts.year <- as.data.frame(predicts.year)
+
+ggmod.year <- ggplot(predicts.year) +
+  geom_bar(aes(x = year, y = response,  fill = year,), stat = "identity") +
+  geom_line(aes(x= year,y=observed), color = "red", size = 2, group =1) +
+  #scale_y_continuous(sec.axis = sec_axis(~.*1,name="Observed log purple sea urchin density")) +
+  ylab("Log density NERLUE")+
+  xlab('survey_year')+
+  geom_errorbar(aes(x = year, y = response, ymin = response-se.fit,ymax = response+se.fit),width = 0.5) +
+  scale_fill_viridis(option = "D", discrete = T, direction = 1) +
+  theme_classic() +
+  theme(axis.text.x = element_text(size = 12, angle = 45, h = 1),
+        axis.text.y = element_text(size = 12),
+        axis.title = element_text(size = 14))
+
+ggmod.year
+
+
+## removeun 2006 from tain data does not change things much
+
+test <- dat2 %>%
+  dplyr::filter(year == 2006) %>%
+  glimpse()
+
+test <- train.gam %>%
+  dplyr::filter(year == 2006) %>%
+  glimpse()
