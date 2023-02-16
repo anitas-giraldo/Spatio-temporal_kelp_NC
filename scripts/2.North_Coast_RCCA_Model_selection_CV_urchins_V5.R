@@ -45,8 +45,8 @@ rm(list = ls())
 m.dir <- here()
 d.dir <- here('data')
 o.dir <- here('outputs_nc_rcca_urchins')
-k.dir <- paste(o.dir, "gam_urchins4", sep ='/')
-#k.dir <- paste(o.dir, "gam_urchins5", sep ='/') # kelp model results
+kx.dir <- paste(o.dir, "gam_urchins4", sep ='/')
+k.dir <- paste(o.dir, "gam_urchins5", sep ='/') # kelp model results
 #u.dir <- paste(d.dir, "gam_urchins3", sep ='/') # urchin model results
 #rcca.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/North_Coast_w_RCCA/raw_data"
 #dd.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/Extract_env_data/nc.rcca.outputs"
@@ -72,7 +72,7 @@ ncsites <- years %>%
 
 ### 1.3. Load RCCA data ----
 
-df <- read.csv(paste(d.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs_orbvel_npp.csv", sep ='/')) %>%
+df <- read.csv(paste(d.dir, "RCCA_kelp_inverts_NC_depth-zones_wave_clim_temp_nit_subs_orbvel_npp_rivmth.csv", sep ='/')) %>%
   mutate_at(vars(site_name, month, year, transect, zone), list(as.factor)) %>%
   glimpse() # Rows: 1,154
 
@@ -131,7 +131,10 @@ dat1 <- df.nc %>%
     # Orb vel
     UBR_Mean, UBR_Max,
     # NPP
-    Mean_Monthly_NPP, Max_Monthly_NPP_Upwelling, Mean_Monthly_NPP_Upwelling, Min_Monthly_NPP) %>%
+    Mean_Monthly_NPP, Max_Monthly_NPP_Upwelling, Mean_Monthly_NPP_Upwelling, Min_Monthly_NPP,
+    # river mouth 
+    min_dist_riv_mth
+    ) %>%
   # Bio transformations
   mutate(log_den_NERLUE = log(den_NERLUE + 1),
          log_den_MESFRAAD = log(den_MESFRAAD + 1),
@@ -158,6 +161,9 @@ dat1 <- df.nc %>%
          log_Min_Monthly_NPP = log(Min_Monthly_NPP + 1)) %>%
   dplyr::select(-c(Mean_Monthly_NPP_Upwelling,
                    Min_Monthly_NPP)) %>%
+  # distance to river mouth
+  mutate(log_min_dist_riv_mth = log(min_dist_riv_mth + 1)) %>%
+  dplyr::select(-c(min_dist_riv_mth)) %>%
   glimpse() # Rows: 708
 
 
@@ -174,7 +180,7 @@ levels(dat2$year)
 # 2. LOAD BEST MODELS ####
 
 ### 2.1. Load best model csv ----
-best_mods <- read.csv(paste(k.dir, "STRPURAD_best_models.csv", sep ='/')) 
+best_mods <- read.csv(paste(kx.dir, "STRPURAD_best_models.csv", sep ='/')) 
 head(best_mods)
 nrow(best_mods)
 
@@ -182,55 +188,28 @@ nrow(best_mods)
 ### 2.2. Get submodels ----
 
 # get submodel 1.1 --
-bm_name <- best_mods$modname[1]
+# bm_name <- best_mods$modname[2]
+# 
+# # get submodel variables --
+# bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+# bm_vars
+# 
+bm_vars <- list()
 
-# get submodel variables --
-bm_vars <- strsplit(bm_name, split = "+", fixed = T)
-bm_vars
+bm_vars[[1]] <- c("Days_10N" , "Max_Monthly_NPP_Upwelling" ,  "log_Min_Monthly_NPP"  , "Max_Monthly_Anomaly_Upwelling_Temp", "mean_depth", "mean_prob_of_rock" )
 
-#bm_vars[[1]] <- bm_vars[[1]][bm_vars[[1]] != "mean_prob_of_rock"]
-
-# submodel 1.2 --
-bm_vars[[2]] <- c(bm_vars[[1]], "mean_prob_of_rock")
-
-# submodel 1.3 --
-bm_vars[[3]] <- c(bm_vars[[1]], "mean_prob_of_rock", "log_UBR_Max")
-
-# submodel 1.4 --
-bm_vars[[4]] <- c(bm_vars[[1]], "mean_prob_of_rock", "log_UBR_Mean")
-
-
-# get submodel 2 --
-bm_name <- best_mods$modname[2]
-
-# get submodel variables --
-bm_vars2 <- strsplit(bm_name, split = "+", fixed = T)
-bm_vars2
-
-# submodel 2.1 --
-bm_vars[[5]] <- bm_vars2[[1]]
-#bm_vars[[5]] <- bm_vars2[[1]][bm_vars2[[1]] != "mean_prob_of_rock"]
-
-# submodel 2.2 --
-bm_vars[[6]] <- c(bm_vars[[5]], "mean_prob_of_rock")
-
-# submodel 2.3 --
-bm_vars[[7]] <- c(bm_vars[[5]], "mean_prob_of_rock", "log_UBR_Max")
-
-# submodel 2.4 --
-bm_vars[[8]] <- c(bm_vars[[5]], "mean_prob_of_rock", "log_UBR_Mean")
-
-
-
+bm_vars[[2]] <- c("Days_10N" , "Max_Monthly_NPP_Upwelling" ,  "log_Min_Monthly_NPP"  , "Max_Monthly_Anomaly_Upwelling_Temp", "mean_depth", "mean_prob_of_rock" ,  "log_min_dist_riv_mth")
 
 bm_vars
+
 
 ### 2.3. Set submodel names ----
 no_submodels <- length(bm_vars)
 
-submodels <- c('1.1', '1.2', '1.3', '1.4', '2.1', '2.2', '2.3', '2.4')
+submodels <- paste(1:no_submodels)
 
 submodel_names <- paste("bm", submodels, sep = '')
+submodel_names
 
 
 ### 2.4. Set number of folds ----
@@ -239,6 +218,9 @@ no_folds <- 15
 
 ### 2.5. Set data frame to save summary stats ----
 overall.summary <- data.frame()
+
+### Standard error function ----
+std.error <- function(x) sd(x)/sqrt(length(x))
 
 
 # 3. LOOP ----
@@ -470,7 +452,8 @@ for (i in 1:no_submodels){
     pivot_longer(cols = dev.exp:rmse, names_to = "summary_stat", values_to = "values") %>%
     mutate_at(vars(id, summary_stat), list(as.factor)) %>%
     group_by(summary_stat) %>%
-    summarise(mean_stat = mean(values)) %>%
+    summarise(mean_stat = mean(values),
+              se_stat = std.error(values)) %>%
     mutate(submodel = submodel_names[i]) %>%
     mutate_at(vars(submodel), list(as.factor)) %>%
     glimpse()
@@ -499,9 +482,10 @@ head(overall.summary)
 p <- ggplot(overall.summary %>% dplyr::filter(summary_stat != 'mean_R.sqr_test' &
                                                 summary_stat != 'mean_residuals'), 
             aes(x = submodel, y = mean_stat, color = submodel)) +
-  geom_point(size = 5) +
+  geom_errorbar(aes(ymin=mean_stat-se_stat, ymax=mean_stat+se_stat)) +
+  geom_point(size = 3) +
   facet_wrap(~ summary_stat, scales = "free") +
-  scale_color_viridis(discrete = T) +
+  #scale_color_viridis(discrete = T) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, h = 1))
 p
@@ -567,23 +551,21 @@ bm_vars[6]
 library(visreg)
 library(caret)
 
-# Get vars bm1.3 ----
+# Get vars bm2.2 ----
 
-# define bm --
-bm.no <- "bm1.3"
 
-bm_vars[[3]]
+bm_vars[[1]]
 
 
 # 2. Divide data into train and test ----
 
-inTraining <- createDataPartition(dat2$log_den_STRPURAD, p = 0.75, list = FALSE)
+inTraining <- createDataPartition(dat2$log_den_NERLUE, p = 0.75, list = FALSE)
 train.gam <- dat2[ inTraining,]
 test.gam  <- dat2[-inTraining,]
 
 
 # 3. Get predictor variables ----
-pred.vars <- bm_vars[[3]]
+pred.vars <- bm_vars[[1]]
 
 
 # 4. Get Gam formula ----
@@ -592,7 +574,7 @@ pred.vars <- bm_vars[[3]]
 dep <- 'log_den_STRPURAD'
 
 # set predictors --
-preds <- bm_vars[[3]]
+preds <- bm_vars[[1]]
 
 # get variables with smoothers --
 
@@ -615,25 +597,82 @@ bm_form
 
 # 5. Run Gam ----
 
-gam1.3 <- gam(formula = log_den_STRPURAD ~ 
-                #s(Days_10N, k = 4, bs = "cr") + 
-                #s(log_Days_16C,  k = 4, bs = "cr") + 
-                #s(log_Mean_Monthly_NPP_Upwelling, k = 4,  bs = "cr") + 
-                #s(log_Min_Monthly_NPP, k = 4, bs = "cr") + 
-                s(Max_Monthly_Anomaly_Upwelling_Temp,   k = 4, bs = "cr") + 
-                s(mean_depth, k = 4, bs = "cr") + s(mean_prob_of_rock, k = 4, bs = "cr") + 
-                #s(log_UBR_Max, k = 4, bs = "cr") + 
-                s(site_name, zone, bs = "re") + 
-                s(year, bs = "re"), 
-            family = tw(), data = train.gam, method = "GCV")
+gam1 <- gam(bm_form, 
+            family = tw(), data = dat2, method = "GCV")
 
 
-summary(gam1.3)
-gam.check(gam1.3)
+
+summary(gam1)
+gam.check(gam1)
+gam1$aic
 
 par(mfrow=c(3,3),mar=c(2,4,3,1))
-visreg(gam1.3)
+visreg(gam1)
 dev.off()
+
+# OTHER MOD ----
+
+# Get vars bm2.2 ----
+
+
+bm_vars[[2]]
+
+
+# 2. Divide data into train and test ----
+
+inTraining <- createDataPartition(dat2$log_den_NERLUE, p = 0.75, list = FALSE)
+train.gam <- dat2[ inTraining,]
+test.gam  <- dat2[-inTraining,]
+
+
+# 3. Get predictor variables ----
+pred.vars <- bm_vars[[2]]
+
+
+# 4. Get Gam formula ----
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[2]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+# 5. Run Gam ----
+
+gam2 <- gam(bm_form, 
+            family = tw(), data = dat2, method = "GCV")
+
+
+
+summary(gam2)
+gam.check(gam2)
+gam2$aic
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(gam2)
+dev.off()
+
+
+
 
 
 # 6. Predict on test data ----
