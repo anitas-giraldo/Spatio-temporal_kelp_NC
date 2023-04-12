@@ -543,15 +543,6 @@ ggsave(plot = p3, filename = "best_models_CV_summary_stats_min.png", device = "p
 
 ##
 
-best_mods$formula[1]
-best_mods$formula[2]
-
-###
-
-###
-
-###
-
 ##
 
 ##
@@ -586,7 +577,7 @@ preds2
 
 
 # get random variables --
-random_vars <- "s(site_campus_unique_ID, zone, bs = 're') + s(survey_year, bs = 're')"
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
 # set model formula --
@@ -646,7 +637,7 @@ preds2
 
 
 # get random variables --
-random_vars <- "s(site_campus_unique_ID, zone, bs = 're') + s(survey_year, bs = 're')"
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
 # set model formula --
@@ -704,7 +695,7 @@ preds2
 
 
 # get random variables --
-random_vars <- "s(site_campus_unique_ID, zone, bs = 're') + s(survey_year, bs = 're')"
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
 # set model formula --
@@ -762,7 +753,7 @@ preds2
 
 
 # get random variables --
-random_vars <- "s(site_campus_unique_ID, zone, bs = 're') + s(survey_year, bs = 're')"
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
 # set model formula --
@@ -819,7 +810,7 @@ preds2
 
 
 # get random variables --
-random_vars <- "s(site_campus_unique_ID, zone, bs = 're') + s(survey_year, bs = 're')"
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
 # set model formula --
@@ -877,7 +868,7 @@ preds2
 
 
 # get random variables --
-random_vars <- "s(site_campus_unique_ID, zone, bs = 're') + s(survey_year, bs = 're')"
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
 # set model formula --
@@ -935,7 +926,7 @@ preds2
 
 
 # get random variables --
-random_vars <- "s(site_campus_unique_ID, zone, bs = 're') + s(survey_year, bs = 're')"
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
 # set model formula --
@@ -992,7 +983,7 @@ preds2
 
 
 # get random variables --
-random_vars <- "s(site_campus_unique_ID, zone, bs = 're') + s(survey_year, bs = 're')"
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
 # set model formula --
