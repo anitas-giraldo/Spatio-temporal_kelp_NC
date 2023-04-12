@@ -1,7 +1,7 @@
 # 
 
 # Script by Anita Giraldo - 2 May 2022
-# last modified by Anita Giraldo - 14 July 2022 - new orb vel and NPP data from Tom
+# last modified by Anita Giraldo - 12 Abril 2023
 
 
 ## This script takes the best models obtained from FSSgam and selects the best one using CROSS VALIDATION 
@@ -45,7 +45,8 @@ rm(list = ls())
 m.dir <- here()
 d.dir <- here('data')
 o.dir <- here('outputs_nc_rcca_urchins')
-k.dir <- paste(o.dir, "gam_urchins4", sep ='/')
+#k.dir <- paste(o.dir, "gam_urchins4", sep ='/')
+cv.dir <- paste(o.dir, "new_cvs", sep ='/')
 #k.dir <- paste(o.dir, "gam_urchins5", sep ='/') # kelp model results
 #u.dir <- paste(d.dir, "gam_urchins3", sep ='/') # urchin model results
 #rcca.dir <- "G:/Shared drives/California Kelp Restoration Project - Seagrant/R_Projects/North_Coast_w_RCCA/raw_data"
@@ -169,87 +170,53 @@ dat2 <- dat1 %>%
 
 glimpse(dat2)
 levels(dat2$year)
+names(dat2)
 
 
 # 2. LOAD BEST MODELS ####
 
+
 ### 2.1. Load best model csv ----
-best_mods <- read.csv(paste(k.dir, "STRPURAD_best_models.csv", sep ='/')) 
+best_mods <- read.csv(paste(cv.dir, "best_models_new_cvs.csv", sep ='/')) 
 head(best_mods)
-nrow(best_mods)
 
-
-### 2.2. Get submodels ----
-
-# get submodel 1.1 --
-bm_name <- best_mods$modname[1]
-
-# get submodel variables --
-bm_vars <- strsplit(bm_name, split = "+", fixed = T)
-bm_vars
-
-#bm_vars[[1]] <- bm_vars[[1]][bm_vars[[1]] != "mean_prob_of_rock"]
-
-# submodel 1.2 --
-bm_vars[[2]] <- c(bm_vars[[1]], "mean_prob_of_rock")
-
-# submodel 1.3 --
-bm_vars[[3]] <- c(bm_vars[[1]], "mean_prob_of_rock", "log_UBR_Max")
-
-# submodel 1.4 --
-bm_vars[[4]] <- c(bm_vars[[1]], "mean_prob_of_rock", "log_UBR_Mean")
-
-
-# get submodel 2 --
-bm_name <- best_mods$modname[2]
-
-# get submodel variables --
-bm_vars2 <- strsplit(bm_name, split = "+", fixed = T)
-bm_vars2
-
-# submodel 2.1 --
-bm_vars[[5]] <- bm_vars2[[1]]
-#bm_vars[[5]] <- bm_vars2[[1]][bm_vars2[[1]] != "mean_prob_of_rock"]
-
-# submodel 2.2 --
-bm_vars[[6]] <- c(bm_vars[[5]], "mean_prob_of_rock")
-
-# submodel 2.3 --
-bm_vars[[7]] <- c(bm_vars[[5]], "mean_prob_of_rock", "log_UBR_Max")
-
-# submodel 2.4 --
-bm_vars[[8]] <- c(bm_vars[[5]], "mean_prob_of_rock", "log_UBR_Mean")
+names(best_mods)
+names(best_mods) <- c("bm_id"  , "modname")
+names(best_mods)
 
 
 
+### 2.2. Set submodel names ----
+no_submodels <- nrow(best_mods)
+no_submodels
 
-bm_vars
 
-### 2.3. Set submodel names ----
-no_submodels <- length(bm_vars)
-
-submodels <- c('1.1', '1.2', '1.3', '1.4', '2.1', '2.2', '2.3', '2.4')
+#submodels <- c('3.0', '3.1', '3.2', '3.3')
+submodels <- paste(1:no_submodels)
 
 submodel_names <- paste("bm", submodels, sep = '')
 
 
-### 2.4. Set number of folds ----
+### 2.3. Set number of folds ----
 no_folds <- 15
 
 
-### 2.5. Set data frame to save summary stats ----
+### 2.4. Set data frame to save summary stats ----
 overall.summary <- data.frame()
 
+
+### Standard error function ----
+std.error <- function(x) sd(x)/sqrt(length(x))
 
 # 3. LOOP ----
 
 for (i in 1:no_submodels){
   
   # 3.1. Get submodel name --
-  #bm_name <- best_mods$modname[i]
+  bm_name <- best_mods$modname[i]
   
   # get submodel variables --
-  #bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+  bm_vars <- strsplit(bm_name, split = "+", fixed = T)
   
   # 3.2. Set model formula --
   
@@ -257,7 +224,7 @@ for (i in 1:no_submodels){
   dep <- 'log_den_STRPURAD'
   
   # set predictors --
-  preds <- bm_vars[[i]]
+  preds <- bm_vars[[1]]
   
   # get variables with smoothers --
   
@@ -470,7 +437,8 @@ for (i in 1:no_submodels){
     pivot_longer(cols = dev.exp:rmse, names_to = "summary_stat", values_to = "values") %>%
     mutate_at(vars(id, summary_stat), list(as.factor)) %>%
     group_by(summary_stat) %>%
-    summarise(mean_stat = mean(values)) %>%
+    summarise(mean_stat = mean(values),
+              se_stat = std.error(values)) %>%
     mutate(submodel = submodel_names[i]) %>%
     mutate_at(vars(submodel), list(as.factor)) %>%
     glimpse()
@@ -490,7 +458,7 @@ beep()
 # 4. SAVE SUMMARY ----
 head(overall.summary)
 
-#write.csv(overall.summary, paste(k.dir, "best_models_CV_summary_stats_added_vars.csv", sep ='/'))
+write.csv(overall.summary, paste(cv.dir, "best_models_CV_summary_stats.csv", sep ='/'))
 
 
 
@@ -499,7 +467,8 @@ head(overall.summary)
 p <- ggplot(overall.summary %>% dplyr::filter(summary_stat != 'mean_R.sqr_test' &
                                                 summary_stat != 'mean_residuals'), 
             aes(x = submodel, y = mean_stat, color = submodel)) +
-  geom_point(size = 5) +
+  geom_errorbar(aes(ymin=mean_stat-se_stat, ymax=mean_stat+se_stat)) +
+  geom_point(size = 3) +
   facet_wrap(~ summary_stat, scales = "free") +
   scale_color_viridis(discrete = T) +
   theme_bw() +
@@ -509,7 +478,7 @@ p
 
 # save plot --
 
-#ggsave(plot = p, filename = "best_models_summary_stats_added_vars.png", device = "png", path = k.dir)
+ggsave(plot = p, filename = "best_models_summary_stats.png", device = "png", path = cv.dir)
 
 
 # 6. Compute best statistics ----
@@ -524,7 +493,7 @@ sum.sum <- overall.summary %>%
   glimpse()
 
 
-ggplot(sum.sum %>%
+p1 <- ggplot(sum.sum %>%
          dplyr::select(sum_stat, sum_max, sum_min, submodel),
        aes(x = submodel, y = sum_stat, color = sum_stat)) +
   geom_point(size = 5) +
@@ -533,8 +502,14 @@ ggplot(sum.sum %>%
   scale_color_viridis() +
   theme(axis.text.x = element_text(angle = 45, h = 1))
 
+p1
 
-ggplot(sum.sum %>%
+ggsave(plot = p1, filename = "best_models_summary_stats_sum.png", device = "png", path = cv.dir)
+
+##
+
+
+p2 <- ggplot(sum.sum %>%
          dplyr::select(sum_stat, sum_max, sum_min, submodel),
        aes(x = submodel, y = sum_max, color = sum_max)) +
   geom_point(size = 5) +
@@ -543,7 +518,14 @@ ggplot(sum.sum %>%
   scale_color_viridis() +
   theme(axis.text.x = element_text(angle = 45, h = 1))
 
-ggplot(sum.sum %>%
+p2
+
+ggsave(plot = p2, filename = "best_models_summary_stats_max.png", device = "png", path = cv.dir)
+
+##
+
+
+p3 <- ggplot(sum.sum %>%
          dplyr::select(sum_stat, sum_max, sum_min, submodel),
        aes(x = submodel, y = sum_min, color = sum_min)) +
   geom_point(size = 5) +
@@ -552,12 +534,12 @@ ggplot(sum.sum %>%
   scale_color_viridis() +
   theme(axis.text.x = element_text(angle = 45, h = 1))
 
+p3
+
+
+ggsave(plot = p3, filename = "best_models_summary_stats_min.png", device = "png", path = cv.dir)
 
 ##
-
-bm_vars[6]
-
-
 
 ###
 
@@ -567,32 +549,26 @@ bm_vars[6]
 library(visreg)
 library(caret)
 
-# Get vars bm1.3 ----
 
-# define bm --
-bm.no <- "bm1.3"
+##
 
-bm_vars[[3]]
+##
 
+# BM 1 ----
 
-# 2. Divide data into train and test ----
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[1]
 
-inTraining <- createDataPartition(dat2$log_den_STRPURAD, p = 0.75, list = FALSE)
-train.gam <- dat2[ inTraining,]
-test.gam  <- dat2[-inTraining,]
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
 
-
-# 3. Get predictor variables ----
-pred.vars <- bm_vars[[3]]
-
-
-# 4. Get Gam formula ----
+# 3.2. Set model formula --
 
 # set dependent variable --
 dep <- 'log_den_STRPURAD'
 
 # set predictors --
-preds <- bm_vars[[3]]
+preds <- bm_vars[[1]]
 
 # get variables with smoothers --
 
@@ -604,6 +580,8 @@ for (j in 1:length(preds)) {
   preds2 <- append(preds2, pred_form)
 }
 
+preds2
+
 
 # get random variables --
 random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
@@ -613,229 +591,1032 @@ random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
 bm_form
 
-# 5. Run Gam ----
-
-gam1.3 <- gam(formula = log_den_STRPURAD ~ 
-                #s(Days_10N, k = 4, bs = "cr") + 
-                #s(log_Days_16C,  k = 4, bs = "cr") + 
-                #s(log_Mean_Monthly_NPP_Upwelling, k = 4,  bs = "cr") + 
-                #s(log_Min_Monthly_NPP, k = 4, bs = "cr") + 
-                s(Max_Monthly_Anomaly_Upwelling_Temp,   k = 4, bs = "cr") + 
-                s(mean_depth, k = 4, bs = "cr") + s(mean_prob_of_rock, k = 4, bs = "cr") + 
-                #s(log_UBR_Max, k = 4, bs = "cr") + 
-                s(site_name, zone, bs = "re") + 
-                s(year, bs = "re"), 
-            family = tw(), data = train.gam, method = "GCV")
 
 
-summary(gam1.3)
-gam.check(gam1.3)
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm1 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm1$aic
+summary(bm1)
+gam.check(bm)
 
 par(mfrow=c(3,3),mar=c(2,4,3,1))
-visreg(gam1.3)
+visreg(bm)
 dev.off()
 
 
-# 6. Predict on test data ----
-mod<-gam1.3
 
-glimpse(test.gam)
+##
 
+##
 
-testdata <- test.gam %>%
-  dplyr::select(log_den_STRPURAD,
-                "Days_10N", 
-                "log_Days_16C", 
-                "log_Mean_Monthly_NPP_Upwelling",
-                "log_Min_Monthly_NPP" ,              
-                "Max_Monthly_Anomaly_Upwelling_Temp", 
-                "mean_depth" ,
-                "mean_prob_of_rock",
-                "log_UBR_Max",
-                site_name, zone, year)
+# BM 2 ----
 
-fits <- predict.gam(mod, newdata=testdata, type='response', se.fit=T)
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[2]
 
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
 
-predicts.year = testdata%>%data.frame(fits)%>%
-  group_by(year)%>% #only change here
-  summarise(response=mean(fit),se.fit=mean(se.fit))%>%
-  ungroup()
+# 3.2. Set model formula --
 
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
 
-# 7. Plot mean yearly kelp predicted vs observed ----
+# set predictors --
+preds <- bm_vars[[1]]
 
-predicts.all <-  testdata %>% data.frame(fits)%>%
-  #group_by(survey_year)%>% #only change here
-  #summarise(response=mean(fit),se.fit=mean(se.fit))%>%
-  ungroup() %>%
-  glimpse()
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
 
 
-
-predicts.year2 <- predicts.all %>%
-  rename(log_fit = fit,
-         log_se.fit = se.fit) %>%
-  mutate(den_STRPURAD = (exp(log_den_STRPURAD) - 1),
-         fit = (exp(log_fit) - 1),
-         se.fit = (exp(log_se.fit) - 1)) %>%
-  # mutate(den_NERLUE = (10^(log_den_NERLUE) - 1),
-  #        fit = (10^(log_fit) - 1),
-  #        se.fit = (10^(log_se.fit) - 1)) %>%
-  glimpse()
-
-predicts.year3 <- predicts.year2 %>%
-  group_by(year) %>% # only change here
-  summarise(response = mean(fit, na.rm = T),
-            se.fit2 = mean(se.fit, na.rm = T),
-            sd.fit = sd(fit, na.rm = T),
-            n.fit = length(fit),
-            se.fit = sd.fit/(sqrt(n.fit)),
-            log_response = mean(log_fit, na.rm = T),
-            log_se.fit = mean(log_se.fit, na.rm = T),
-            observed = mean(den_STRPURAD, na.rm = T),
-            sd.obs = sd(den_STRPURAD, na.rm = T),
-            n.obs = length(den_STRPURAD),
-            se.obs = sd.obs/(sqrt(n.obs)),
-            log_observed = mean(log_den_STRPURAD, na.rm = T),
-            log_sd.obs = sd(log_den_STRPURAD, na.rm = T),
-            log_n.obs = length(log_den_STRPURAD),
-            log_se.obs = log_sd.obs/(sqrt(log_n.obs))) %>%
-  dplyr::filter(year != "2006") %>% # remove 2006 because only 1 observation
-  ungroup() %>%
-  glimpse()
-
-# plot test in log scale
-ggmod.year <- ggplot( data=predicts.year3) +
-  geom_bar(aes(x=year,y=log_response,fill=year), stat = "identity")+
-  scale_fill_viridis(discrete = T, direction = 1, option = "G") +
-  geom_errorbar(aes(x=year,y=log_response, ymin = log_response-log_se.fit,ymax = log_response+log_se.fit),width = 0.5) +
-  geom_line(aes(x=year, y= log_observed), group = 1, color = 'red', size = 1.5) +
-  geom_errorbar(aes(x=year,y=log_observed, ymin = log_observed-log_se.obs,ymax = log_observed+log_se.obs),width = 0.5, col = 'red') +
-  ylab("Log density S. purpuratus")+
-  xlab('survey_year')+
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, h = 1))
-#Theme1+
-#annotate("text", x = -Inf, y=Inf, label = "(a)",vjust = 1, hjust = -.1,size=5)+
-#annotate("text", x = -Inf, y=Inf, label = "   Dosinia subrosea",vjust = 1, hjust = -.1,size=5,fontface="italic")
-ggmod.year
-
-# plot test actual density
-ggmod.year <- ggplot(data=predicts.year3) +
-  geom_bar(aes(x=year,y=response,fill=year), stat = "identity")+
-  scale_fill_viridis(discrete = T, direction = 1, option = "G") +
-  geom_errorbar(aes(x=year,y=response, ymin = response-se.fit,ymax = response+se.fit),width = 0.5) +
-  geom_line(aes(x=year, y= observed), group = 1, color = 'red', size = 1.5) +
-  geom_errorbar(aes(x=year,y=observed, ymin = observed-se.obs,ymax = observed+se.obs),width = 0.5, col = 'red') +
-  ylab("Density S. purpuratus")+
-  xlab('survey_year')+
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, h = 1))
-#Theme1+
-#annotate("text", x = -Inf, y=Inf, label = "(a)",vjust = 1, hjust = -.1,size=5)+
-#annotate("text", x = -Inf, y=Inf, label = "   Dosinia subrosea",vjust = 1, hjust = -.1,size=5,fontface="italic")
-ggmod.year
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
 
 
-# 8. Plot by site ----
-predicts.year4 <- predicts.year2 %>%
-  group_by(year, site_name) %>% # only change here
-  summarise(response = mean(fit, na.rm = T),
-            se.fit2 = mean(se.fit, na.rm = T),
-            sd.fit = sd(fit, na.rm = T),
-            n.fit = length(fit),
-            se.fit = sd.fit/(sqrt(n.fit)),
-            log_response = mean(log_fit, na.rm = T),
-            log_se.fit = mean(log_se.fit, na.rm = T),
-            observed = mean(den_STRPURAD, na.rm = T),
-            sd.obs = sd(den_STRPURAD, na.rm = T),
-            n.obs = length(den_STRPURAD),
-            se.obs = sd.obs/(sqrt(n.obs)),
-            log_observed = mean(log_den_STRPURAD, na.rm = T),
-            log_sd.obs = sd(log_den_STRPURAD, na.rm = T),
-            log_n.obs = length(log_den_STRPURAD),
-            log_se.obs = log_sd.obs/(sqrt(log_n.obs))) %>%
-  dplyr::filter(year != "2006") %>% # remove 2006 because only 1 observation
-  ungroup() %>%
-  glimpse()
-
-
-# plot test in log scale
-ggmod.year1 <- ggplot( data=predicts.year4 %>% dplyr::filter(site_name == "Mendocino Headlands")) +
-  geom_bar(aes(x=year,y=log_response,fill=year), stat = "identity")+
-  scale_fill_viridis(discrete = T, direction = 1, option = "G") +
-  geom_errorbar(aes(x=year,y=log_response, ymin = log_response-log_se.fit,ymax = log_response+log_se.fit),width = 0.5) +
-  geom_line(aes(x=year, y= log_observed), group = 1, color = 'red', size = 1.5) +
-  geom_errorbar(aes(x=year,y=log_observed, ymin = log_observed-log_se.obs,ymax = log_observed+log_se.obs),width = 0.5, col = 'red') +
-  labs(title = "Mendocino Headlands") +
-  ylab("Log density S. purpuratus")+
-  xlab('survey_year')+
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, h = 1))
-#Theme1+
-#annotate("text", x = -Inf, y=Inf, label = "(a)",vjust = 1, hjust = -.1,size=5)+
-#annotate("text", x = -Inf, y=Inf, label = "   Dosinia subrosea",vjust = 1, hjust = -.1,size=5,fontface="italic")
-ggmod.year1
-
-
-# plot test actual density
-ggmod.year2 <- ggplot(data=predicts.year4 %>% dplyr::filter(site_name == "Mendocino Headlands")) +
-  geom_bar(aes(x=year,y=response,fill=year), stat = "identity")+
-  scale_fill_viridis(discrete = T, direction = 1, option = "G") +
-  geom_errorbar(aes(x=year,y=response, ymin = response-se.fit,ymax = response+se.fit),width = 0.5) +
-  geom_line(aes(x=year, y= observed), group = 1, color = 'red', size = 1.5) +
-  geom_errorbar(aes(x=year,y=observed, ymin = observed-se.obs,ymax = observed+se.obs),width = 0.5, col = 'red') +
-  labs(title = "Mendocino Headlands") +
-  ylab("Density S. purpuratus")+
-  xlab('survey_year')+
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 45, h = 1))
-#Theme1+
-#annotate("text", x = -Inf, y=Inf, label = "(a)",vjust = 1, hjust = -.1,size=5)+
-#annotate("text", x = -Inf, y=Inf, label = "   Dosinia subrosea",vjust = 1, hjust = -.1,size=5,fontface="italic")
-ggmod.year2
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
 
 
 
-levels(testdata$site_name)
-
-
-# 9. Plot predicted vs observed ----
-
-library(ggpmisc)
-
-
-my.formula <- y ~ x
-
-#ggsave(namep, plot = last_plot(), device = 'png', path = o2.dir)
-
-
-p <- ggplot(predicts.year2, aes(x = log_fit, y = log_den_STRPURAD)) +
-  geom_smooth(method = "lm", se=FALSE, color="black", formula = my.formula) +
-  stat_poly_eq(formula = my.formula, 
-               #aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
-               aes(label = paste(..rr.label..)),
-               parse = TRUE, size = 4) +         
-  geom_point() +
-  geom_abline(aes(intercept = 0, slope = 1, color = 'red'), show.legend = F) +
-  #scale_color_viridis(discrete = T) +
-  labs(x='Predicted', y='Observed', title='S. purpuratus') +
-  theme_classic()
-p
-
-p <- ggplot(predicts.year2, aes(x = fit, y = den_STRPURAD)) +
-  geom_smooth(method = "lm", se=FALSE, color="black", formula = my.formula) +
-  stat_poly_eq(formula = my.formula, 
-               #aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
-               aes(label = paste(..rr.label..)),
-               parse = TRUE, size = 4) +         
-  geom_point() +
-  geom_abline(aes(intercept = 0, slope = 1, color = 'red'), show.legend = F) +
-  #scale_color_viridis(discrete = T) +
-  labs(x='Predicted', y='Observed', title='S. purpuratus') +
-  theme_classic()
-p
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm12 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
 
 
 
+# check model ----
+
+bm2$aic
+summary(bm2)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+
+
+##
+
+##
+
+# BM 3 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[3]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm3 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm3$aic
+summary(bm3)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+
+##
+
+##
+
+# BM 4 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[4]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm4 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm4$aic
+summary(bm4)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 5 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[5]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm5 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm5$aic
+summary(bm5)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 6 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[6]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm6 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm6$aic
+summary(bm6)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 7 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[7]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm7 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm7$aic
+summary(bm7)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 8 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[8]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm8 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm8$aic
+summary(bm8)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 9 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[9]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm9 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm9$aic
+summary(bm9)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 10 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[10]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm10 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm10$aic
+summary(bm10)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 11 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[11]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm11 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm11$aic
+summary(bm11)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 12 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[12]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm12 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm12$aic
+summary(bm12)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 13 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[13]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm13 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm13$aic
+summary(bm13)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 14 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[14]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm14 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm14$aic
+summary(bm14)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 15 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[15]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm15 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm15$aic
+summary(bm15)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 16 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[16]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm16 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm16$aic
+summary(bm16)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 17 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[17]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm17 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm17$aic
+summary(bm17)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
+
+# BM 18 ----
+
+# 3.1. Get submodel name --
+bm_name <- best_mods$modname[18]
+
+# get submodel variables --
+bm_vars <- strsplit(bm_name, split = "+", fixed = T)
+
+# 3.2. Set model formula --
+
+# set dependent variable --
+dep <- 'log_den_STRPURAD'
+
+# set predictors --
+preds <- bm_vars[[1]]
+
+# get variables with smoothers --
+
+preds2 <- character()
+
+for (j in 1:length(preds)) {
+  pred.x <- preds[j]
+  pred_form <- paste("s(", pred.x, ", k = 4, bs = 'cr')", sep = '')
+  preds2 <- append(preds2, pred_form)
+}
+
+preds2
+
+
+# get random variables --
+random_vars <- "s(site_name, zone, bs = 're') + s(year, bs = 're')"
+
+
+# set model formula --
+bm_form <- as.formula(paste(dep, paste(paste(preds2, collapse = " + "), random_vars, sep = "+"), sep=" ~ "))
+bm_form
+
+
+
+# Fit model bm 3 using all data ----
+#bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
+bm18 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+
+
+
+# check model ----
+
+bm18$aic
+summary(bm18)
+gam.check(bm)
+
+par(mfrow=c(3,3),mar=c(2,4,3,1))
+visreg(bm)
+dev.off()
+
+##
+
+##
