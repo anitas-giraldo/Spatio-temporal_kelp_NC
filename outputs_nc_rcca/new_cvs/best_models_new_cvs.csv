@@ -1,0 +1,3 @@
+bm_id,Formula
+bm1,log_days_16C+Mean_Monthly_Upwelling_Temp+Max_Monthly_Nitrate+depth_mean+mean_prob_of_rock+wh_mean+log_UBR_max+Mean_Monthly_NPP
+bm2,log_days_16C+Max_Monthly_Nitrate+depth_mean+mean_prob_of_rock+wh_mean+log_UBR_max+Mean_Monthly_NPP
