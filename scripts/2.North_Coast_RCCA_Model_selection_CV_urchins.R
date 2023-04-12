@@ -656,7 +656,7 @@ bm_form
 
 # Fit model bm 3 using all data ----
 #bm1 <- gam(bm_form, family = tw(), data = dat2, method = "GCV.Cp")
-bm12 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
+bm2 <- gam(bm_form, family = tw(), data = dat2, method = "REML")
 
 
 
