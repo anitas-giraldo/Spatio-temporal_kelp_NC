@@ -867,3 +867,80 @@ ggmod.year
 # save
 namep3 <- "Urchins_NC_all-data_year_average.png"
 ggsave(namep3, plot = ggmod.year, device = 'png', path = cv.dir, scale = 1, dpi = 300)
+
+
+###
+
+###
+
+###
+
+# Correlation of selected variables ----
+
+library(corrplot)
+library(plotROC) 
+library(RColorBrewer)
+
+predictors <- dat2 %>%
+  dplyr::select(paste(preds)) %>%
+  glimpse()
+
+C <- cor(predictors, method = "pearson")
+head(round(C,1))
+C
+
+
+# compute the p-value of correlations --
+# mat : is a matrix of data
+# ... : further arguments to pass to the native R cor.test function
+cor.mtest <- function(mat, ...) {
+  mat <- as.matrix(mat)
+  n <- ncol(mat)
+  p.mat<- matrix(NA, n, n)
+  diag(p.mat) <- 0
+  for (i in 1:(n - 1)) {
+    for (j in (i + 1):n) {
+      tmp <- cor.test(mat[, i], mat[, j], ...)
+      p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
+    }
+  }
+  colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
+  p.mat
+}
+# matrix of the p-value of the correlation
+p.mat <- cor.mtest(predictors)
+head(p.mat[, 1:5])
+
+# customize correlogram --
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(C, method="color", col=col(100),  
+         type="lower", order="hclust", 
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.cex = 0.8, tl.col="black", tl.srt= 45, # Text label size, color and rotation 
+         cl.cex =  0.8, # legend text size
+         number.cex = 0.6, # text labels size
+         # Combine with significance
+         p.mat = p.mat, sig.level = 0.01, insig = "blank", 
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE 
+)
+
+corrplot(C, method="color", type = "lower", order="hclust", tl.cex = 0.7, tl.col = 'black', tl.srt= 45)
+
+
+# save
+png(filename = paste(cv.dir, "corr_plot.png", sep ='/'), res = 300, width = 7.5, height = 7.5, units = "in")
+
+corrplot(C, method="color", col=col(100),  
+         type="lower", order="hclust", 
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.cex = 0.8, tl.col="black", tl.srt= 45, # Text label size, color and rotation 
+         cl.cex =  0.8, # legend text size
+         number.cex = 0.6, # text labels size
+         # Combine with significance
+         p.mat = p.mat, sig.level = 0.01, insig = "blank", 
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE 
+)
+
+dev.off()
