@@ -172,7 +172,7 @@ dat2 <- dat1 %>%
 glimpse(dat2)
 levels(dat2$year)
 names(dat2)
-
+min(dat2$mean_depth)
 
 # 2. LOAD BEST MODELS ####
 
