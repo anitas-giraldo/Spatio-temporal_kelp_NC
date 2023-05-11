@@ -519,7 +519,7 @@ length(year.list)
 
 # outputs dir ----
 # * use an output directory of yours
-preds.dir <- paste(cv.dir, "preds", sep ='/')
+preds.dir <- paste(cv.dir, "preds_with_predictors", sep ='/')
 preds.dir
 
 
@@ -561,6 +561,18 @@ for (i in 1:length(year.list)) {
   # 7. predict
   year.pred.df <- predict.gam(mod.V1, newdata=df4, type='response', se.fit=T)
   head(year.pred.df)
+  
+  # preds with predictors
+  preds.preds <- df4 %>% 
+    data.frame(year.pred.df) %>%
+    #dplyr::select(x, y, fit) %>%
+    # so urchins do not exceed the maximum recorded
+    dplyr::mutate(fit = replace(fit, fit > max.urch, max.urch)) %>%
+    na.omit() %>%
+    glimpse()
+  
+  name.csvx <- paste(year.no, "Log_STRPURAD_NC_predictors.csv", sep = '_')
+  write.csv(preds.preds, paste(preds.dir, name.csvx, sep = '/'))
   
   # 8. join with df for lats and lons
   preds.all <-  df4 %>% 
